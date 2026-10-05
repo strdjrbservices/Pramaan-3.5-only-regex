@@ -1186,6 +1186,89 @@ def extract_v1_kb_table(page) -> Dict[str, Any]:
     return rows_data
 
 
+def extract_v1_level_room_detail_table(page) -> Dict[str, Any]:
+    """
+    Extracts all rows from Level and Room Detail table using precision spatial coordinates.
+    Dynamically captures Level in Unit (e.g. Level 1, Level 2), Grade Level Detail (e.g. Above Grade),
+    Finish (e.g. Finished), Area (e.g. 2,334 Sq. Ft.), and multi-line Room Summary (e.g. 1 - Kitchen\n3 - Bedroom).
+    """
+    words = page.get_text("words")
+    hdr_words = [w for w in words if w[0] < 120 and w[4] == "Level" and any(w2[4] == "Unit" and abs(w2[1] - w[1]) < 5 for w2 in words)]
+    if not hdr_words:
+        # Fallback to single word Level header
+        hdr_words = [w for w in words if w[0] < 120 and w[4] == "Level" and any(w2[4] in ["Grade", "Finish", "Area"] and abs(w2[1] - w[1]) < 5 for w2 in words)]
+        if not hdr_words:
+            return {}
+
+    y_hdr = hdr_words[0][1]
+
+    # Find table bottom (e.g. "Quality and Condition" or "Interior Quality Rating" or next section)
+    bot_candidates = [w for w in words if w[1] > y_hdr and (
+        (w[4] == "Quality" and any(w2[4] == "Condition" and abs(w2[1] - w[1]) < 5 for w2 in words)) or
+        (w[4] == "Interior" and any(w2[4] == "Quality" and abs(w2[1] - w[1]) < 5 for w2 in words)) or
+        (w[4] == "Kitchen" and any(w2[4] == "Bathroom" and abs(w2[1] - w[1]) < 5 for w2 in words))
+    )]
+    y_bottom = min([w[1] for w in bot_candidates]) if bot_candidates else y_hdr + 220
+
+    table_words = [w for w in words if y_hdr + 8 <= w[1] < y_bottom - 2]
+    # Row starters are words in the leftmost column representing level ("Level", "Basement", "1st", "2nd", etc.)
+    row_starters = [w for w in table_words if w[0] < 130 and re.match(r"^(?:Level|Basement|\d+(?:st|nd|rd|th)?)$", w[4], re.I)]
+    row_starters.sort(key=lambda x: x[1])
+
+    # Filter row starters that are too close vertically (< 10 px)
+    filtered_starters = []
+    for s in row_starters:
+        if not filtered_starters or (s[1] - filtered_starters[-1][1]) >= 15:
+            filtered_starters.append(s)
+
+    rows_data: Dict[str, Any] = {}
+    for idx, starter in enumerate(filtered_starters):
+        row_idx = idx + 1
+        y_start = starter[1] - 4
+        y_end = filtered_starters[idx + 1][1] - 4 if idx + 1 < len(filtered_starters) else y_bottom - 2
+
+        r_words = [w for w in table_words if y_start <= w[1] < y_end]
+
+        col_level = [w for w in r_words if w[0] < 130]
+        col_grade = [w for w in r_words if 130 <= w[0] < 240]
+        col_finish = [w for w in r_words if 240 <= w[0] < 340]
+        col_area = [w for w in r_words if 340 <= w[0] < 450]
+        col_room = [w for w in r_words if w[0] >= 450]
+
+        def join_col_single(wlist):
+            sw = sorted(wlist, key=lambda x: (round(x[1] / 5) * 5, x[0]))
+            return clean_text_value(" ".join([w[4] for w in sw if w[4].strip()]))
+
+        def join_room_summary(wlist):
+            if not wlist:
+                return ""
+            # Group lines by vertical position y
+            sw = sorted(wlist, key=lambda x: (x[1], x[0]))
+            lines_dict = {}
+            for w in sw:
+                line_y = round(w[1] / 7) * 7
+                if line_y not in lines_dict:
+                    lines_dict[line_y] = []
+                lines_dict[line_y].append(w)
+            
+            out_lines = []
+            for ly in sorted(lines_dict.keys()):
+                lw = sorted(lines_dict[ly], key=lambda x: x[0])
+                line_text = " ".join([w[4] for w in lw if w[4].strip()])
+                line_clean = clean_text_value(line_text)
+                if line_clean and not re.search(r"Quality|Condition|Rating", line_clean, re.I):
+                    out_lines.append(line_clean)
+            return "\n".join(out_lines)
+
+        rows_data[f"Level in Unit Row {row_idx}"] = join_col_single(col_level)
+        rows_data[f"Grade Level Detail Row {row_idx}"] = join_col_single(col_grade)
+        rows_data[f"Finish Row {row_idx}"] = join_col_single(col_finish)
+        rows_data[f"Area Row {row_idx}"] = join_col_single(col_area)
+        rows_data[f"Room Summary Row {row_idx}"] = join_room_summary(col_room)
+
+    return rows_data
+
+
 def extract_v1_interior_features_table(page) -> Dict[str, Any]:
     """
     Extracts Flooring, Walls and Ceiling, and other interior feature rows from Interior Features table.
@@ -1575,15 +1658,18 @@ def extract_v1_improvements_section(doc, full_doc_text: str, summary: Dict[str, 
     if m_tbh:
         imp["Total Bathrooms - Half"] = m_tbh.group(1)
 
-    # Level and Room Detail
-    m_lrd = re.search(r"Level\s+in\s+Unit\s+Grade\s+Level\s+Detail\s+Finish\s+Area\s+Room\s+Summary\s*\n\s*([^\n\r]+?)\s+([^\n\r]+?)\s+(Finished|Unfinished)\s+([\d,]+\s*(?:Sq\s*\.?\s*Ft\.?)?)\s+([\s\S]*?)(?=Quality\s+and\s+Condition|Kitchen|\n\n|\Z)", dw_text, re.I)
-    if m_lrd:
-        imp["Level in Unit Row 1"] = clean_text_value(m_lrd.group(1))
-        imp["Grade Level Detail Row 1"] = clean_text_value(m_lrd.group(2))
-        imp["Finish Row 1"] = clean_text_value(m_lrd.group(3))
-        imp["Area Row 1"] = clean_text_value(m_lrd.group(4))
-        rs_lines = [l.strip() for l in m_lrd.group(5).splitlines() if l.strip() and not re.search(r"Quality|Condition|Rating", l, re.I)]
-        imp["Room Summary Row 1"] = "\n".join(rs_lines) if rs_lines else clean_text_value(m_lrd.group(5))
+    # Level and Room Detail, Kitchen and Bathroom Details & Interior Features (Precision Spatial extraction)
+    for page in doc:
+        ptxt = page.get_text("text")
+        if "Level and Room Detail" in ptxt or ("Level in Unit" in ptxt and "Grade Level Detail" in ptxt):
+            lrd_data = extract_v1_level_room_detail_table(page)
+            if lrd_data:
+                imp.update(lrd_data)
+        if "Kitchen and Bathroom Details" in ptxt:
+            kb_data = extract_v1_kb_table(page)
+            imp.update(kb_data)
+            int_data = extract_v1_interior_features_table(page)
+            imp.update(int_data)
 
     # Interior Quality and Condition
     m_iqr = re.search(r"Interior\s+Quality\s+Rating\s*[:\-]?\s*([Q1-6q1-6]+|[^\n\r]+?)(?=\s+Interior\s+Condition|\n|\Z)", dw_text, re.I)
@@ -1593,16 +1679,6 @@ def extract_v1_improvements_section(doc, full_doc_text: str, summary: Dict[str, 
     m_icr = re.search(r"Interior\s+Condition\s+Rating\s*[:\-]?\s*([C1-6c1-6]+|[^\n\r]+)", dw_text, re.I)
     if m_icr:
         imp["Interior Condition Rating"] = clean_text_value(m_icr.group(1))
-
-    # Kitchen and Bathroom Details & Interior Features (Spatial extraction)
-    for page in doc:
-        ptxt = page.get_text("text")
-        if "Kitchen and Bathroom Details" in ptxt:
-            kb_data = extract_v1_kb_table(page)
-            imp.update(kb_data)
-            int_data = extract_v1_interior_features_table(page)
-            imp.update(int_data)
-            break
 
     m_ousb = re.search(r"Overall\s+Update\s+Status\s+for\s*(?:\n\s*)?Bathrooms\s*[:\-]?\s*([^\n\r]+)", dw_text, re.I)
     if m_ousb:
