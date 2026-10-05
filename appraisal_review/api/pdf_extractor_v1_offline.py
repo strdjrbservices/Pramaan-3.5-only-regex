@@ -1092,6 +1092,17 @@ def extract_v1_site_section(doc, full_doc_text: str, summary: Dict[str, Any]) ->
     if m_kbc:
         site["Known Building Certifications"] = clean_text_value(m_kbc.group(1))
 
+    m_ker = re.search(r"Known\s+Efficiency\s+Ratings\s*[:\-]?\s*([^\n\r]+)", site_text, re.I)
+    if m_ker:
+        site["Known Efficiency Ratings"] = clean_text_value(m_ker.group(1))
+
+    m_eimpact = re.search(r"Energy\s+Efficient\s+and\s+Green\s+Features\s+Impact\s+to\s+Value/Marketability[\s\S]*?Impact\s+to\s+Value/Marketability\s*[:\-]?\s*([^\n\r]+)", site_text, re.I) or \
+                re.search(r"Impact\s+to\s+Value/Marketability\s*[:\-]?\s*([^\n\r]+)", site_text, re.I)
+    if m_eimpact:
+        val_imp = clean_text_value(m_eimpact.group(1))
+        site["Energy Efficient and Green Features Impact to Value/Marketability"] = val_imp
+        site["Impact to Value/Marketability"] = val_imp
+
     # Highest and Best Use 4 tests
     m_lp = re.search(r"Legally\s+Permissible\s*[:\-]?\s*([^\n\r]+)", site_text, re.I)
     if m_lp:

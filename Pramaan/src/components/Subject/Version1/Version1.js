@@ -537,7 +537,7 @@ const Version1 = ({
             />
           </Paper>
 
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
+          <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 1 }}>
             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Site Commentary</Typography>
             <EditableField
               fieldPath={['SITE', 'Site Commentary']}
@@ -553,6 +553,132 @@ const Version1 = ({
               showBlankValidation={extractionAttempted}
             />
           </Paper>
+
+          {/* Energy Efficient and Green Features */}
+          <TableContainer component={Paper} variant="outlined" sx={{ mb: 3, borderRadius: 1, overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: '#2c3e50', color: '#fff', px: 2, py: 1 }}>
+              <Typography variant="subtitle2" fontWeight="bold">Energy Efficient and Green Features</Typography>
+            </Box>
+            <Table size="small">
+              <TableHead sx={{ bgcolor: '#f8f9fa' }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold', width: '33%' }}>Renewable Energy Components</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '33%' }}>Ownership</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', width: '34%' }}>Financing Arrangement</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow>
+                  <TableCell>
+                    <EditableField
+                      fieldPath={['SITE', 'Renewable Energy Components']}
+                      value={data.SITE?.['Renewable Energy Components'] || data['Renewable Energy Components'] || ''}
+                      onDataChange={handleDataChange}
+                      editingField={editingField}
+                      setEditingField={setEditingField}
+                      isEditable={true}
+                      allData={allData}
+                      manualValidations={manualValidations}
+                      handleManualValidation={handleManualValidation}
+                      revisionHandlers={revisionHandlers}
+                      showBlankValidation={extractionAttempted}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <EditableField
+                      fieldPath={['SITE', 'Ownership']}
+                      value={data.SITE?.['Ownership'] || data['Ownership'] || ''}
+                      onDataChange={handleDataChange}
+                      editingField={editingField}
+                      setEditingField={setEditingField}
+                      isEditable={true}
+                      allData={allData}
+                      manualValidations={manualValidations}
+                      handleManualValidation={handleManualValidation}
+                      revisionHandlers={revisionHandlers}
+                      showBlankValidation={extractionAttempted}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <EditableField
+                      fieldPath={['SITE', 'Financing Arrangement']}
+                      value={data.SITE?.['Financing Arrangement'] || data['Financing Arrangement'] || ''}
+                      onDataChange={handleDataChange}
+                      editingField={editingField}
+                      setEditingField={setEditingField}
+                      isEditable={true}
+                      allData={allData}
+                      manualValidations={manualValidations}
+                      handleManualValidation={handleManualValidation}
+                      revisionHandlers={revisionHandlers}
+                      showBlankValidation={extractionAttempted}
+                    />
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Known Building Certifications</TableCell>
+                  <TableCell colSpan={2}>
+                    <EditableField
+                      fieldPath={['SITE', 'Known Building Certifications']}
+                      value={data.SITE?.['Known Building Certifications'] || data['Known Building Certifications'] || ''}
+                      onDataChange={handleDataChange}
+                      editingField={editingField}
+                      setEditingField={setEditingField}
+                      isEditable={true}
+                      allData={allData}
+                      manualValidations={manualValidations}
+                      handleManualValidation={handleManualValidation}
+                      revisionHandlers={revisionHandlers}
+                      showBlankValidation={extractionAttempted}
+                    />
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Known Efficiency Ratings</TableCell>
+                  <TableCell colSpan={2}>
+                    <EditableField
+                      fieldPath={['SITE', 'Known Efficiency Ratings']}
+                      value={data.SITE?.['Known Efficiency Ratings'] || data['Known Efficiency Ratings'] || ''}
+                      onDataChange={handleDataChange}
+                      editingField={editingField}
+                      setEditingField={setEditingField}
+                      isEditable={true}
+                      allData={allData}
+                      manualValidations={manualValidations}
+                      handleManualValidation={handleManualValidation}
+                      revisionHandlers={revisionHandlers}
+                      showBlankValidation={extractionAttempted}
+                    />
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Energy Efficient and Green Features Impact to Value/Marketability */}
+          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1, overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: '#e9ecef', px: 2, py: 1, borderBottom: '1px solid #ced4da' }}>
+              <Typography variant="subtitle2" fontWeight="bold">Energy Efficient and Green Features Impact to Value/Marketability</Typography>
+            </Box>
+            <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="body2" fontWeight="bold" sx={{ minWidth: '220px' }}>Impact to Value/Marketability</Typography>
+              <Box sx={{ flexGrow: 1 }}>
+                <EditableField
+                  fieldPath={['SITE', 'Energy Efficient and Green Features Impact to Value/Marketability']}
+                  value={data.SITE?.['Energy Efficient and Green Features Impact to Value/Marketability'] || data.SITE?.['Impact to Value/Marketability'] || data['Energy Efficient and Green Features Impact to Value/Marketability'] || data['Impact to Value/Marketability'] || ''}
+                  onDataChange={handleDataChange}
+                  editingField={editingField}
+                  setEditingField={setEditingField}
+                  isEditable={true}
+                  allData={allData}
+                  manualValidations={manualValidations}
+                  handleManualValidation={handleManualValidation}
+                  revisionHandlers={revisionHandlers}
+                  showBlankValidation={extractionAttempted}
+                />
+              </Box>
+            </Box>
+          </TableContainer>
         </Box>
       </Paper>
 
