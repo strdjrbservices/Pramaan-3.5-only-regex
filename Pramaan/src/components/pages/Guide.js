@@ -106,7 +106,7 @@ const Guide = () => {
 
           <SectionHeader><Link component={RouterLink} to="/extractor" color="primary" underline="hover">Full File Review</Link></SectionHeader>
           <Typography paragraph color="text.secondary" sx={{ lineHeight: 1.7 }}>
-            <strong>Supported Forms:</strong> 1004, 1004C, 1004D, 1025, 1073, 2090, 203k-FHA, 2055, 1075, 2095, 1007, 216, 1025 + 1007, 1073 + 1007, Appraisal Version #1, ECR.
+            <strong>Supported Forms:</strong> 1004, 1004C, 1004D, 1025, 1073, 2090, 203k-FHA, 2055, 1075, 2095, 1007, 216, 1025 + 1007, 1073 + 1007, Appraisal Version #1, ERC.
           </Typography>
           <List dense>
             <BulletPoint title="1. Upload:">Select your appraisal PDF file.</BulletPoint>

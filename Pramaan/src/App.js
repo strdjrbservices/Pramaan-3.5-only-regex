@@ -116,7 +116,8 @@ function App() {
             <Route path='/logo' element={<DJRBLogo />} />
             <Route path="/" element={<HomePage />} />
             <Route path="/extractor" element={<Subject />} />
-            <Route path="/ecr" element={<Subject defaultFormType="ECR" />} />
+            <Route path="/erc" element={<Subject defaultFormType="ERC" />} />
+            <Route path="/ecr" element={<Subject defaultFormType="ERC" />} />
             <Route path="/query" element={<CustomQuery />} />
             <Route path="/compare" element={<Compare />} />
             <Route path="/html-extractor" element={<HtmlExtractor />} />

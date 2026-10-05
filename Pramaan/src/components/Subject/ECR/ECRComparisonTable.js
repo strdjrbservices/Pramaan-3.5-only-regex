@@ -56,8 +56,8 @@ export const getFriendlyFieldLabel = (field) => {
 
 export const ECRComparisonTable = ({
   comparisonRows = [],
-  file1Name = 'ECR Main Pdf',
-  file2Name = 'ECR 2nd Report',
+  file1Name = 'ERC Main Pdf',
+  file2Name = 'ERC 2nd Report',
   onFieldChange,
   isEditable = true
 }) => {
@@ -136,7 +136,7 @@ export const ECRComparisonTable = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `ECR_Comparison_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `ERC_Comparison_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

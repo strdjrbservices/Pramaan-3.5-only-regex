@@ -379,9 +379,9 @@ const HomePage = () => {
           </Grid>
           <Grid item xs={12} md={4}>
             <AnimatedCard
-              to="/ecr"
-              title="ECR Review"
-              desc="Exterior / Evaluation Condition Report with side-by-side comparison."
+              to="/erc"
+              title="ERC Review"
+              desc="Employee Relocation Council (ERC) Report with side-by-side comparison."
               icon={<CompareArrowsIcon />}
               color="#e91e63"
             />

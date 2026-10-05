@@ -1,7 +1,6 @@
 import React from 'react';
 import { SubjectInfoCard, GridInfoCard, MarketConditionsTable, EditableField } from '../components/FormComponents';
 import { Tooltip, IconButton } from '@mui/material';
-import { CondoCoopProjectsTable } from '../components/tables';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import ActionButtons from '../components/ActionButtons';
 import PhotosGallerySection from '../components/PhotosGallerySection';

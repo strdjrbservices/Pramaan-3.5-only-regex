@@ -840,31 +840,41 @@ export const ECRMarketTrendsTable = ({
         </Box>
 
         <TableContainer>
-          <Table size="small" sx={{ minWidth: 800, '& th, & td': { border: '1px solid #cfd8dc', p: 0.8 } }}>
+          <Table size="small" sx={{ minWidth: 900, '& th, & td': { border: '1px solid #cfd8dc', p: 0.8 } }}>
             <TableHead>
               <TableRow sx={{ bgcolor: 'grey.100' }}>
-                <TableCell sx={{ fontWeight: 700, width: '25%' }}>Feature</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: '20%' }}>Item / Feature</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700, width: '20%', bgcolor: '#e3f2fd' }}>
+                  Subject Property
+                </TableCell>
                 {competingProps.map((p) => (
-                  <TableCell key={p} align="center" sx={{ fontWeight: 700, width: '25%' }}>
+                  <TableCell key={p} align="center" sx={{ fontWeight: 700, width: '20%' }}>
                     Competing Property #{p}
                   </TableCell>
                 ))}
               </TableRow>
             </TableHead>
             <TableBody>
-              {competingAttrs.map((attr) => (
-                <TableRow key={attr.key} hover>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{attr.label}</TableCell>
-                  {competingProps.map((p) => {
-                    const key = `Competing Property #${p} - ${attr.key}`;
-                    const fallbackKey = `Competing Property - ${attr.key}`;
-                    const val = getFieldVal(key) || (p === 1 ? getFieldVal(fallbackKey) : '');
+              {competingAttrs.map((attr) => {
+                const isSubjectDisabled = attr.key === "Proximity to Subject" || attr.key === "Comparative Rating to Subject";
+                const subjectKey = `Subject Property - ${attr.key}`;
+                const subjectFallbackKey = `Competing Property - Subject - ${attr.key}`;
+                const subjectVal = getFieldVal(subjectKey) || getFieldVal(subjectFallbackKey) || '';
 
-                    return (
-                      <TableCell key={p}>
+                return (
+                  <TableRow key={attr.key} hover>
+                    <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{attr.label}</TableCell>
+
+                    {/* Subject Property Column */}
+                    <TableCell sx={{ bgcolor: isSubjectDisabled ? 'grey.200' : '#f8fafd' }}>
+                      {isSubjectDisabled ? (
+                        <Typography variant="body2" color="text.secondary" align="center" sx={{ fontStyle: 'italic', fontSize: '0.8rem' }}>
+                          —
+                        </Typography>
+                      ) : (
                         <EditableField
-                          fieldPath={['MARKET_TRENDS', key]}
-                          value={val}
+                          fieldPath={['MARKET_TRENDS', subjectKey]}
+                          value={subjectVal}
                           onDataChange={handleDataChange}
                           editingField={editingField}
                           setEditingField={setEditingField}
@@ -872,11 +882,33 @@ export const ECRMarketTrendsTable = ({
                           allData={allData || data}
                           revisionHandlers={revisionHandlers}
                         />
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))}
+                      )}
+                    </TableCell>
+
+                    {/* Competing Properties Columns */}
+                    {competingProps.map((p) => {
+                      const key = `Competing Property #${p} - ${attr.key}`;
+                      const fallbackKey = `Competing Property - ${attr.key}`;
+                      const val = getFieldVal(key) || (p === 1 ? getFieldVal(fallbackKey) : '');
+
+                      return (
+                        <TableCell key={p}>
+                          <EditableField
+                            fieldPath={['MARKET_TRENDS', key]}
+                            value={val}
+                            onDataChange={handleDataChange}
+                            editingField={editingField}
+                            setEditingField={setEditingField}
+                            isEditable={isEditable}
+                            allData={allData || data}
+                            revisionHandlers={revisionHandlers}
+                          />
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>

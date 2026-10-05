@@ -148,11 +148,11 @@ const ECR = ({
 
   const handleComparePDFs = async () => {
     if (!file1 && (!file1Data || Object.keys(file1Data).length === 0)) {
-      setCompareError('Please select ECR Main Pdf.');
+      setCompareError('Please select ERC Main Pdf.');
       return;
     }
     if (!file2 && (!file2Data || Object.keys(file2Data).length === 0)) {
-      setCompareError('Please select ECR Secondary Pdf.');
+      setCompareError('Please select ERC Secondary Pdf.');
       return;
     }
 
@@ -175,7 +175,7 @@ const ECR = ({
         setCompareProgress(25);
         const formData1 = new FormData();
         formData1.append('file', file1);
-        formData1.append('form_type', 'ECR');
+        formData1.append('form_type', 'ERC');
 
         const res1 = await fetch(`${API_BASE_URL}/api/extract/`, {
           method: 'POST',
@@ -195,7 +195,7 @@ const ECR = ({
       if (file2) {
         const formData2 = new FormData();
         formData2.append('file', file2);
-        formData2.append('form_type', 'ECR');
+        formData2.append('form_type', 'ERC');
 
         const res2 = await fetch(`${API_BASE_URL}/api/extract/`, {
           method: 'POST',
@@ -214,7 +214,7 @@ const ECR = ({
       setCompareSuccess('Both PDF files successfully extracted and compared!');
       playSound('success');
     } catch (err) {
-      console.error('ECR Comparison Error:', err);
+      console.error('ERC Comparison Error:', err);
       setCompareError(err.message || 'An error occurred during comparison.');
       playSound('error');
     } finally {
@@ -512,7 +512,7 @@ const ECR = ({
           <CompareArrowsIcon color="primary" sx={{ fontSize: 32 }} />
           <Box>
             <Typography variant="h5" fontWeight={800} color="primary.main">
-              ECR PDF Comparison & Review
+              ERC PDF Comparison & Review
             </Typography>
           </Box>
         </Stack>
@@ -562,7 +562,7 @@ const ECR = ({
                 </Box>
                 <Box sx={{ textAlign: 'left', flexGrow: 1, overflow: 'hidden' }}>
                   <Typography variant="subtitle1" fontWeight={700}>
-                    ECR Main Pdf
+                    ERC Main Pdf
                   </Typography>
                   <Typography
                     variant="body2"
@@ -633,7 +633,7 @@ const ECR = ({
                 </Box>
                 <Box sx={{ textAlign: 'left', flexGrow: 1, overflow: 'hidden' }}>
                   <Typography variant="subtitle1" fontWeight={700}>
-                    ECR Secondary Pdf
+                    ERC Secondary Pdf
                   </Typography>
                   <Typography
                     variant="body2"
@@ -798,8 +798,8 @@ const ECR = ({
       {viewMode === 'table' ? (
         <ECRComparisonTable
           comparisonRows={comparisonRows}
-          file1Name={file1?.name ? `PDF 1: ${file1.name}` : 'ECR Main Pdf'}
-          file2Name={file2?.name ? `PDF 2: ${file2.name}` : 'ECR 2nd Report'}
+          file1Name={file1?.name ? `PDF 1: ${file1.name}` : 'ERC Main Pdf'}
+          file2Name={file2?.name ? `PDF 2: ${file2.name}` : 'ERC 2nd Report'}
           onFieldChange={handleComparisonFieldChange}
           isEditable={isEditable}
         />

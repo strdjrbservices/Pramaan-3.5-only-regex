@@ -470,11 +470,21 @@ def _build_multi_category_schema(categories: list) -> dict:
 
 def extract_fields_from_pdf_ecr(pdf_path, category: str | None = None, custom_prompt: str | None = None, prompt_type: str = "checklist"):
     """
-    Extracts structured fields from an ECR appraisal PDF using Gemini File API & Caching.
-    - If custom_prompt is provided: executes custom query or checklist verification.
-    - If category is specified: executes single-category extraction in 1 focused call.
-    - If full document extraction: executes 3 clean, comprehensive steps covering all 9 sections.
+    Extracts structured fields from an ECR appraisal PDF.
+    - If no custom_prompt and no category: runs 100% regex-based offline extraction.
+    - If custom_prompt is provided: executes custom query or checklist verification via Gemini.
+    - If category is specified: executes single-category extraction via Gemini.
     """
+    if not category and not custom_prompt:
+        print("[ECR] Running 100% regex-based offline extraction for full ECR document...")
+        try:
+            from api.pdf_extractor_ecr_offline import extract_fields_from_pdf_ecr_offline
+        except ImportError:
+            from .pdf_extractor_ecr_offline import extract_fields_from_pdf_ecr_offline  # type: ignore
+        offline_res = extract_fields_from_pdf_ecr_offline(pdf_path)
+        if offline_res.get("status") == "success":
+            return offline_res
+
     combined_result = {}
     raw_responses = []
 
@@ -632,7 +642,18 @@ def extract_fields_from_pdf_ecr(pdf_path, category: str | None = None, custom_pr
                 combined_result.update(parsed_data)
                 return {'fields': combined_result, 'raw': "\n\n".join(raw_responses)}
 
-        # 3. Full Document Extraction via 3 Clean, Structured Steps
+        # 3. Full Document Extraction via Deterministic Regex & Spatial Offline Engine
+        if not category and not custom_prompt:
+            print("[ECR] Running 100% regex-based offline extraction for full ECR document...")
+            try:
+                from api.pdf_extractor_ecr_offline import extract_fields_from_pdf_ecr_offline
+            except ImportError:
+                from .pdf_extractor_ecr_offline import extract_fields_from_pdf_ecr_offline  # type: ignore
+            offline_res = extract_fields_from_pdf_ecr_offline(pdf_path)
+            if offline_res.get("status") == "success":
+                return offline_res
+
+        # 3b. Fallback to Gemini 3-step structured extraction if offline extraction is not used/fails
         print("[ECR] Starting 3-step structured full document extraction...")
         for step_info in ECR_EXTRACTION_STEPS:
             step_num: int = int(step_info["step_num"])

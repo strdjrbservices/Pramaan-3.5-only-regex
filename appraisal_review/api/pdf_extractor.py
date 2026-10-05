@@ -539,6 +539,10 @@ FORM_TYPE_CATEGORIES = {
     "ECR": [
         "SUMMARY", "SUBJECT", "NEIGHBORHOOD", "SITE", "IMPROVEMENTS",
         "MARKET_TRENDS", "SALES_COMPARISON", "ANTICIPATED_SALES_PRICE", "CERTIFICATION"
+    ],
+    "ERC": [
+        "SUMMARY", "SUBJECT", "NEIGHBORHOOD", "SITE", "IMPROVEMENTS",
+        "MARKET_TRENDS", "SALES_COMPARISON", "ANTICIPATED_SALES_PRICE", "CERTIFICATION"
     ]
 }
 DEFAULT_CATEGORIES = [
@@ -572,7 +576,7 @@ GENERAL_INSTRUCTIONS = (
 CATEGORY_SPECIFIC_INSTRUCTIONS = {
     "SUBJECT": (
         "--- SUBJECT Section Instructions ---\n"
-        "1. **'From Type'**: STRICTLY identify the primary appraisal form type and any additional forms present in all the pages the PDF. Scan ALL headers and footers for form numbers ON THE ALL PAGES OF THE REPORT. Combine multiple forms with ' + ' (e.g., '1004 + 1007'). Primary Types: 1004 (URAR), 1073 (Condo), 1025 (Multi-family), 2055 (Exterior), 1004C (Manufactured), 2090, 1075. Additional Types: 1007 (Rent Schedule), 1004D (Update/Completion), 92051, Compliance Inspection. Allowed Values: [1025, 1073, 1004, 1007, 1004D, 2090, 1007, 92051, 2055, As-is + ARV Reports, 203K FHA, 1075, 71A/71B, 1004C, ACE + PDR, Appraisal Version #1, ECR].\n"
+        "1. **'From Type'**: STRICTLY identify the primary appraisal form type and any additional forms present in all the pages the PDF. Scan ALL headers and footers for form numbers ON THE ALL PAGES OF THE REPORT. Combine multiple forms with ' + ' (e.g., '1004 + 1007'). Primary Types: 1004 (URAR), 1073 (Condo), 1025 (Multi-family), 2055 (Exterior), 1004C (Manufactured), 2090, 1075. Additional Types: 1007 (Rent Schedule), 1004D (Update/Completion), 92051, Compliance Inspection. Allowed Values: [1025, 1073, 1004, 1007, 1004D, 2090, 1007, 92051, 2055, As-is + ARV Reports, 203K FHA, 1075, 71A/71B, 1004C, ACE + PDR, Appraisal Version #1, ERC, ECR].\n"
         "2. **'ADU File Check'**: If the 'One with Accessory Unit' checkbox is checked, set this value to 'Yes', otherwise 'No'.\n"
         "2. **'Exposure comment'**: Please find out the comment from the report for the Exposure comment using the wording/keywords 'Exposure', 'expo days', 'exposure time', 'expo', 'time', 'marketing time'. If present extract the full sentence/narrative comment, otherwise 'Not Present'.\n"
         "2. **'Prior service comment'**: If the 'Prior service comment' is present the value , otherwise 'Not Present'.\n"
@@ -1126,7 +1130,7 @@ def extract_fields_from_pdf(pdf_path, form_type: str, category: str | None = Non
 
 
 def compare_documents(original_path: str, revised_path: str, revision_request: str | None = None, form_type: str | None = None) -> dict:
-    if form_type == "ECR":
+    if form_type in ["ECR", "ERC", "WORLDWIDE ERC"]:
         from api.pdf_extractor_ecr import compare_documents_ecr
         return compare_documents_ecr(original_path, revised_path, revision_request=revision_request) 
     """

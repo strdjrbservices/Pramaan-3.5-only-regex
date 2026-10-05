@@ -48,7 +48,6 @@ import GetAppIcon from '@mui/icons-material/GetApp';
 import autoTable from 'jspdf-autotable';
 import Sidebar from './layout/Sidebar.js';
 import PromptAnalysis from '../tools/PromptAnalysis.js';
-import PhotosGallerySection from './components/PhotosGallerySection.js';
 
 import {
   ContractComparisonDialog,
@@ -296,7 +295,7 @@ function Subject({ defaultFormType }) {
   const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const initialFormType = useMemo(() => {
     if (defaultFormType) return defaultFormType;
-    if (location.pathname === '/ecr') return 'ECR';
+    if (location.pathname === '/ecr' || location.pathname === '/erc') return 'ERC';
     return location.state?.formType || queryParams.get('formType') || '1004';
   }, [defaultFormType, location.pathname, location.state, queryParams]);
   const [selectedFormType, setSelectedFormType] = useState(initialFormType);
@@ -2541,7 +2540,7 @@ function Subject({ defaultFormType }) {
     },
     'GLA': { 'Improvements': 'GLA Improvements Count', 'Grid': 'GLA Sales Comparison Approach Count', 'Photo': 'GLA Photo Count', 'Floorplan': 'GLA Floorplan Count' }
   };
-  const formTypes = ['1004', '1004C', '1004D', '1025', '1073', '2090', '203k-FHA', '2055', '1075', '2095', '1007', '216', '1025 + 1007', '1073 + 1007', '1004 + 1007', '1004MC', 'Appraisal Version #1', 'ECR'];
+  const formTypes = ['1004', '1004C', '1004D', '1025', '1073', '2090', '203k-FHA', '2055', '1075', '2095', '1007', '216', '1025 + 1007', '1073 + 1007', '1004 + 1007', '1004MC', 'Appraisal Version #1', 'ERC'];
 
   const sections = useMemo(() => [
     { id: 'subject-info', title: 'Subject', category: 'SUBJECT', icon: <HomeIcon /> },
@@ -2736,16 +2735,224 @@ function Subject({ defaultFormType }) {
       setNotification({ open: true, message: 'No data to export.', severity: 'warning' });
       return;
     }
-    const jsonString = JSON.stringify(data, null, 2);
+
+    const errors = typeof getValidationErrors === 'function' ? getValidationErrors() : [];
+    const successes = typeof getValidationSuccesses === 'function' ? getValidationSuccesses() : [];
+
+    // Build quick lookup maps for errors and successes by path key and field name
+    const errorMapByPath = {};
+    const errorMapByName = {};
+    errors.forEach(err => {
+      // err: [sectionName, fieldName, message, path]
+      const [, fName, message, path] = err;
+      if (path && Array.isArray(path)) {
+        errorMapByPath[JSON.stringify(path)] = message;
+      }
+      if (fName) {
+        errorMapByName[fName.toLowerCase()] = message;
+      }
+    });
+
+    const successMapByPath = {};
+    const successMapByName = {};
+    successes.forEach(suc => {
+      // suc: [properSection, fieldName, status, path]
+      const [, fName, status, path] = suc;
+      if (path && Array.isArray(path)) {
+        successMapByPath[JSON.stringify(path)] = status;
+      }
+      if (fName) {
+        successMapByName[fName.toLowerCase()] = status;
+      }
+    });
+
+    const pdfId = 'p101';
+    const pdfName = selectedFile?.name || 'appraisal_data.pdf';
+
+    let sectionIndex = 1;
+
+    const sectionEntries = [];
+    const processedSectionKeys = new Set();
+
+    const processSection = (sectionKey, sectionTitle, sectionFieldsObj) => {
+      if (!sectionFieldsObj || typeof sectionFieldsObj !== 'object') return;
+      const currentSectionNum = sectionIndex++;
+      const sectionId = `s${100 + currentSectionNum}`;
+      let fieldCounter = currentSectionNum * 100 + 1;
+      const fields = [];
+
+      Object.entries(sectionFieldsObj).forEach(([fieldKey, rawVal]) => {
+        let fieldValue = rawVal;
+        let fieldComment = undefined;
+        if (typeof rawVal === 'object' && rawVal !== null) {
+          fieldValue = rawVal.value !== undefined ? rawVal.value : '';
+          if (rawVal.comment !== undefined) fieldComment = rawVal.comment;
+        }
+
+        const path = sectionKey === 'Subject' ? [fieldKey] : [sectionKey, fieldKey];
+        const pathKey = JSON.stringify(path);
+        const fieldNameLower = fieldKey.toLowerCase();
+
+        let validationStatus = 'Unvalidated';
+        let validationRuleOrMessage = null;
+
+        if (manualValidations && (manualValidations[pathKey] || manualValidations[JSON.stringify([sectionKey, fieldKey])])) {
+          validationStatus = 'Passed (Manually Validated)';
+          validationRuleOrMessage = 'Manual verification passed by reviewer';
+        } else if (errorMapByPath[pathKey] || errorMapByName[fieldNameLower]) {
+          validationStatus = 'Error';
+          validationRuleOrMessage = errorMapByPath[pathKey] || errorMapByName[fieldNameLower];
+        } else if (successMapByPath[pathKey] || successMapByName[fieldNameLower]) {
+          validationStatus = successMapByPath[pathKey] || successMapByName[fieldNameLower] || 'Passed';
+          validationRuleOrMessage = 'Passed validation rule checks';
+        }
+
+        const currentFieldId = `f${fieldCounter++}`;
+        const fieldItem = {
+          field_id: currentFieldId,
+          field_name: fieldKey,
+          field_value: fieldValue,
+          ...(fieldComment !== undefined && { field_comment: fieldComment }),
+          validation_on_field: validationRuleOrMessage,
+          validation_status: validationStatus,
+          path: path
+        };
+
+        fields.push(fieldItem);
+      });
+
+      sectionEntries.push({
+        section_id: sectionId,
+        section_key: sectionKey,
+        section_name: sectionTitle || sectionKey,
+        total_fields: fields.length,
+        fields: fields
+      });
+    };
+
+    // 1. Process regular sections in data
+    Object.keys(data).forEach(sectionKey => {
+      if (comparableSales.includes(sectionKey) || comparableRents.includes(sectionKey) || ComparableRentAdjustments.includes(sectionKey)) {
+        return;
+      }
+      processedSectionKeys.add(sectionKey);
+      const sectionData = data[sectionKey];
+      if (typeof sectionData === 'object' && sectionData !== null && !Array.isArray(sectionData)) {
+        processSection(sectionKey, sectionKey, sectionData);
+      } else {
+        // Flat field at top-level
+        const path = [sectionKey];
+        const pathKey = JSON.stringify(path);
+        const fieldNameLower = sectionKey.toLowerCase();
+        let validationStatus = 'Unvalidated';
+        let validationRuleOrMessage = null;
+
+        if (manualValidations && manualValidations[pathKey]) {
+          validationStatus = 'Passed (Manually Validated)';
+          validationRuleOrMessage = 'Manual verification passed by reviewer';
+        } else if (errorMapByPath[pathKey] || errorMapByName[fieldNameLower]) {
+          validationStatus = 'Error';
+          validationRuleOrMessage = errorMapByPath[pathKey] || errorMapByName[fieldNameLower];
+        } else if (successMapByPath[pathKey] || successMapByName[fieldNameLower]) {
+          validationStatus = successMapByPath[pathKey] || successMapByName[fieldNameLower] || 'Passed';
+          validationRuleOrMessage = 'Passed validation rule checks';
+        }
+
+        let rootSection = sectionEntries.find(s => s.section_key === 'General Information');
+        if (!rootSection) {
+          const currentSectionNum = sectionIndex++;
+          rootSection = {
+            section_id: `s${100 + currentSectionNum}`,
+            section_key: 'General Information',
+            section_name: 'General Information',
+            total_fields: 0,
+            fields: [],
+            _fieldCounter: currentSectionNum * 100 + 1
+          };
+          sectionEntries.unshift(rootSection);
+        }
+
+        const currentFieldId = `f${rootSection._fieldCounter++}`;
+        rootSection.fields.push({
+          field_id: currentFieldId,
+          field_name: sectionKey,
+          field_value: sectionData,
+          validation_on_field: validationRuleOrMessage,
+          validation_status: validationStatus,
+          path: path
+        });
+        rootSection.total_fields = rootSection.fields.length;
+      }
+    });
+
+    // Cleanup temporary _fieldCounter from rootSection if present
+    sectionEntries.forEach(s => {
+      delete s._fieldCounter;
+    });
+
+    // 2. Process Comparable Sales sections
+    comparableSales.forEach(saleName => {
+      if (data[saleName] && typeof data[saleName] === 'object') {
+        processedSectionKeys.add(saleName);
+        processSection(saleName, `Sales Comparison - ${saleName}`, data[saleName]);
+      }
+    });
+
+    // 3. Process Comparable Rents & Adjustments
+    comparableRents.forEach(rentName => {
+      if (data[rentName] && typeof data[rentName] === 'object') {
+        processedSectionKeys.add(rentName);
+        processSection(rentName, `Comparable Rent - ${rentName}`, data[rentName]);
+      }
+    });
+
+    ComparableRentAdjustments.forEach(rentAdjName => {
+      if (data[rentAdjName] && typeof data[rentAdjName] === 'object') {
+        processedSectionKeys.add(rentAdjName);
+        processSection(rentAdjName, `Rent Adjustment - ${rentAdjName}`, data[rentAdjName]);
+      }
+    });
+
+    // Compute summary statistics
+    let totalFields = 0;
+    let totalErrors = 0;
+    let totalPassed = 0;
+    let totalUnvalidated = 0;
+
+    sectionEntries.forEach(sec => {
+      sec.fields.forEach(f => {
+        totalFields++;
+        if (f.validation_status === 'Error') totalErrors++;
+        else if (f.validation_status.startsWith('Passed')) totalPassed++;
+        else totalUnvalidated++;
+      });
+    });
+
+    const structuredExport = {
+      pdf_id: pdfId,
+      pdf_name: pdfName,
+      form_type: selectedFormType || data?.formType || 'Appraisal Form',
+      exported_at: new Date().toISOString(),
+      summary: {
+        total_sections: sectionEntries.length,
+        total_fields: totalFields,
+        total_passed: totalPassed,
+        total_errors: totalErrors,
+        total_unvalidated: totalUnvalidated
+      },
+      sections: sectionEntries
+    };
+
+    const jsonString = JSON.stringify(structuredExport, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${selectedFile?.name.replace('.pdf', '') || 'appraisal_data'}_export.json`;
+    link.download = `${selectedFile?.name.replace(/\.[^/.]+$/, '') || 'appraisal_data'}_structured_export.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    setNotification({ open: true, message: 'Data exported to JSON.', severity: 'success' });
+    setNotification({ open: true, message: 'Structured JSON exported successfully.', severity: 'success' });
   };
 
   const handleClearFiles = () => {
@@ -3907,6 +4114,7 @@ function Subject({ defaultFormType }) {
     let visibleSectionIds = [];
 
     switch (selectedFormType) {
+      case 'ERC':
       case 'ECR':
         return [
           { id: 'summary-section', title: 'Summary', category: 'SUMMARY', icon: <DescriptionIcon /> },
@@ -5312,6 +5520,7 @@ function Subject({ defaultFormType }) {
       case 'Appraisal Version #1':
         formComponent = <Version1 {...props} siteFields={siteFieldsVersion1} allData={{ ...data, comparisonData, formType: selectedFormType }} />;
         break;
+      case 'ERC':
       case 'ECR':
         formComponent = <ECR {...props} allData={{ ...data, comparisonData, formType: selectedFormType }} />;
         break;

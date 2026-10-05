@@ -213,7 +213,7 @@ export const ECRSalesGridTable = ({
         {/* Collapsible Sales Grid Table */}
         <Collapse in={showGridFields} unmountOnExit={false}>
           <TableContainer sx={{ maxHeight: 750 }}>
-          <Table size="small" stickyHeader aria-label="ECR sales comparison grid" sx={{ minWidth: 900 }}>
+          <Table size="small" stickyHeader aria-label="ERC sales comparison grid" sx={{ minWidth: 900 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 700, minWidth: 200, bgcolor: 'grey.100', borderRight: '1px solid #e0e0e0' }}>

@@ -233,6 +233,44 @@ CERTIFICATION_FIELDS = [
 
 
 def extract_fields_from_pdf_v1(pdf_path, category: str | None = None, custom_prompt: str | None = None, prompt_type: str = "checklist"):
+    """
+    Pure Python & Regex-based Offline Extractor for Appraisal Version #1.
+    - If no custom_prompt: runs 100% offline regex extraction with zero external API calls.
+    - If custom_prompt is provided: routes to Gemini for checklist/query processing.
+    """
+    if not custom_prompt:
+        try:
+            try:
+                from api.pdf_extractor_offline import extract_fields_from_pdf_offline
+            except ImportError:
+                from .pdf_extractor_offline import extract_fields_from_pdf_offline  # type: ignore
+            
+            res: Any = extract_fields_from_pdf_offline(pdf_path)
+            if isinstance(res, dict) and res.get("status") == "success":
+                fields = res.get("fields", {})
+                if category and isinstance(fields, dict):
+                    cat_upper = category.upper()
+                    # Return category dictionary along with flat keys if available
+                    cat_data = fields.get(cat_upper, {})
+                    if isinstance(cat_data, dict) and cat_data:
+                        cat_res = {cat_upper: cat_data, **cat_data}
+                        return {
+                            "fields": cat_res,
+                            "raw": json.dumps(cat_res, indent=2, default=str),
+                            "status": "success"
+                        }
+                    # Check in case it's in clean_data
+                    clean_d = res.get("clean_data", {})
+                    if isinstance(clean_d, dict) and cat_upper in clean_d:
+                        return {
+                            "fields": clean_d[cat_upper],
+                            "raw": json.dumps(clean_d[cat_upper], indent=2, default=str),
+                            "status": "success"
+                        }
+                return res
+        except Exception as e:
+            print(f"[Version #1] Offline extraction error: {e}")
+
     combined_result = {}
     raw_responses = []
     

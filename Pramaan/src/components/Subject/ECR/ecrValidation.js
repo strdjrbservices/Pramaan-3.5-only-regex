@@ -6,8 +6,8 @@ export const checkFormIsECR = (data) => {
     data.selected_form_type ||
     data.selectedFormType ||
     ''
-  ).trim();
-  return ft.toUpperCase() === 'ECR';
+  ).trim().toUpperCase();
+  return ft === 'ECR' || ft === 'ERC';
 };
 
 export const checkECRRequiredFields = (field, text, data) => {
@@ -27,7 +27,7 @@ export const checkECRRequiredFields = (field, text, data) => {
   if (!value) {
     return {
       isError: true,
-      message: `'${field}' is mandatory for ECR report.`
+      message: `'${field}' is mandatory for ERC report.`
     };
   }
 

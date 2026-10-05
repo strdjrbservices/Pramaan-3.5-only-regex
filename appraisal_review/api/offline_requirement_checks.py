@@ -578,9 +578,9 @@ def evaluate_photo_requirements(pdf_path: str, extracted_data: Optional[Dict[str
         ("Kitchen Photo", ["KITCHEN"], "Required interior kitchen photograph."),
         ("Main Living Area Photo", ["LIVING", "LIVING ROOM", "FAMILY ROOM"], "Required interior living area photograph."),
         ("Bathroom Photo(s)", ["BATH", "BATHROOM", "FULL BATH", "PRIMARY FULL BATH"], "Required interior bathroom photograph(s)."),
-        ("Comparable 1 Photo", ["COMPARABLE 1", "COMPARABLE #1", "COMP 1"], "Required street view photograph of Comparable Sale #1."),
-        ("Comparable 2 Photo", ["COMPARABLE 2", "COMPARABLE #2", "COMP 2"], "Required street view photograph of Comparable Sale #2."),
-        ("Comparable 3 Photo", ["COMPARABLE 3", "COMPARABLE #3", "COMP 3"], "Required street view photograph of Comparable Sale #3."),
+        ("Comparable 1 Photo", ["COMPARABLE 1", "COMPARABLE #1", "COMP 1", "COMP #1", "COMPARABLE SALE #1", "COMPARABLE SALE 1", "COMPARABLE SALE#1"], "Required street view photograph of Comparable Sale #1."),
+        ("Comparable 2 Photo", ["COMPARABLE 2", "COMPARABLE #2", "COMP 2", "COMP #2", "COMPARABLE SALE #2", "COMPARABLE SALE 2", "COMPARABLE SALE#2"], "Required street view photograph of Comparable Sale #2."),
+        ("Comparable 3 Photo", ["COMPARABLE 3", "COMPARABLE #3", "COMP 3", "COMP #3", "COMPARABLE SALE #3", "COMPARABLE SALE 3", "COMPARABLE SALE#3"], "Required street view photograph of Comparable Sale #3."),
         ("Building Sketch / Floor Plan", ["BUILDING SKETCH", "SKETCH", "INSTAPLAN", "FLOOR PLAN"], "Required exterior building dimensions / floor plan sketch.")
     ]
 
