@@ -381,6 +381,12 @@ const Version1 = ({
                 </TableRow>
               </TableBody>
             </Table>
+            <Box sx={{ p: 2, borderTop: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ minWidth: '170px' }}>Site Influence Commentary:</Typography>
+              <Box sx={{ flexGrow: 1 }}>
+                <EditableField fieldPath={['SITE', 'Site Influence Commentary']} value={data.SITE?.['Site Influence Commentary'] || data['Site Influence Commentary'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} manualValidations={manualValidations} handleManualValidation={handleManualValidation} revisionHandlers={revisionHandlers} showBlankValidation={extractionAttempted} />
+              </Box>
+            </Box>
           </TableContainer>
 
           <TableContainer component={Paper} variant="outlined" sx={{ mb: 4, borderRadius: 1, overflow: 'hidden' }}>
@@ -513,6 +519,40 @@ const Version1 = ({
               </TableBody>
             </Table>
           </TableContainer>
+
+          <Paper variant="outlined" sx={{ p: 2, mb: 3, mt: 3, borderRadius: 1 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Apparent Defects, Damages, Deficiencies (Site)</Typography>
+            <EditableField
+              fieldPath={['SITE', 'Apparent Defects, Damages, Deficiencies (Site)']}
+              value={data.SITE?.['Apparent Defects, Damages, Deficiencies (Site)'] || data['Apparent Defects, Damages, Deficiencies (Site)'] || ''}
+              onDataChange={handleDataChange}
+              editingField={editingField}
+              setEditingField={setEditingField}
+              isEditable={true}
+              allData={allData}
+              manualValidations={manualValidations}
+              handleManualValidation={handleManualValidation}
+              revisionHandlers={revisionHandlers}
+              showBlankValidation={extractionAttempted}
+            />
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Site Commentary</Typography>
+            <EditableField
+              fieldPath={['SITE', 'Site Commentary']}
+              value={data.SITE?.['Site Commentary'] || data['Site Commentary'] || ''}
+              onDataChange={handleDataChange}
+              editingField={editingField}
+              setEditingField={setEditingField}
+              isEditable={true}
+              allData={allData}
+              manualValidations={manualValidations}
+              handleManualValidation={handleManualValidation}
+              revisionHandlers={revisionHandlers}
+              showBlankValidation={extractionAttempted}
+            />
+          </Paper>
         </Box>
       </Paper>
 

@@ -111,7 +111,7 @@ SITE_FIELDS = [
     'Sanitary Sewer', 'Sanitary Sewer Detail', 'Sanitary Sewer Private Utility Impact', 'Sanitary Sewer Comment',
     'Water', 'Water Detail', 'Water Private Utility Impact', 'Water Comment',
     'Utility Type (Public/Private)', 'Utility Detail', 'Utility Impact', 'Utility Comment',
-    'Apparent Defects, Damages, Deficiencies (Site)', 'View Commentary',
+    'Apparent Defects, Damages, Deficiencies (Site)', 'Site Influence Commentary', 'View Commentary', 'Site Features Commentary', 'Site Commentary',
     'Property Access (Street Scene)', 'Renewable Energy Components', 'Ownership', 'Financing Arrangement',
     'Known Building Certifications', 'Known Efficiency Ratings',
     'Energy Efficient and Green Features Impact to Value/Marketability', 'Energy Efficient and Green Features Exhibits',

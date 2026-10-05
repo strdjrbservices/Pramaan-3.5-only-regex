@@ -892,6 +892,7 @@ def extract_v1_site_section(doc, full_doc_text: str, summary: Dict[str, Any]) ->
         "Site Influence Detail": "",
         "Site Influence Impact": "",
         "Site Influence Comment": "",
+        "Site Influence Commentary": "",
         "View": "",
         "Range of View": "",
         "View Impact": "",
@@ -900,12 +901,14 @@ def extract_v1_site_section(doc, full_doc_text: str, summary: Dict[str, Any]) ->
         "Site Feature Detail": "",
         "Site Feature Impact": "",
         "Site Feature Comment": "",
+        "Site Features Commentary": "",
         "Broadband Internet Available": "",
         "Electricity": "",
         "Sanitary Sewer": "",
         "Water": "",
         "Utility Type (Public/Private)": "",
         "Apparent Defects, Damages, Deficiencies (Site)": "",
+        "Site Commentary": "",
         "Property Access (Street Scene)": "",
         "Renewable Energy Components": "",
         "Ownership": "",
@@ -1020,6 +1023,28 @@ def extract_v1_site_section(doc, full_doc_text: str, summary: Dict[str, Any]) ->
             sf_data = extract_v1_site_features_table(page)
             site.update(sf_data)
 
+    # Commentary fallbacks
+    if not site.get("Site Influence Commentary"):
+        m_sic = re.search(r"Site\s+Influence\s+Commentary\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=View\s+and\s+Impact|Site\s+Features|Utilities\s+and\s+Impact|\n\s*\n\s*[A-Z][a-z]+|\Z)", site_text, re.I) or \
+                re.search(r"Site\s+Influence\s+Commentary\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=View\s+and\s+Impact|Site\s+Features|Utilities\s+and\s+Impact|\n\s*\n\s*[A-Z][a-z]+|\Z)", full_doc_text, re.I)
+        if m_sic:
+            val = clean_text_value(m_sic.group(1))
+            if val: site["Site Influence Commentary"] = val
+
+    if not site.get("View Commentary"):
+        m_vc = re.search(r"View\s+Commentary\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=Site\s+Features|Utilities\s+and\s+Impact|\n\s*\n\s*[A-Z][a-z]+|\Z)", site_text, re.I) or \
+               re.search(r"View\s+Commentary\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=Site\s+Features|Utilities\s+and\s+Impact|\n\s*\n\s*[A-Z][a-z]+|\Z)", full_doc_text, re.I)
+        if m_vc:
+            val = clean_text_value(m_vc.group(1))
+            if val: site["View Commentary"] = val
+
+    if not site.get("Site Features Commentary"):
+        m_sfc = re.search(r"Site\s+Features?\s+Commentary\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=Utilities\s+and\s+Impact|Apparent\s+Defects|\n\s*\n\s*[A-Z][a-z]+|\Z)", site_text, re.I) or \
+                re.search(r"Site\s+Features?\s+Commentary\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=Utilities\s+and\s+Impact|Apparent\s+Defects|\n\s*\n\s*[A-Z][a-z]+|\Z)", full_doc_text, re.I)
+        if m_sfc:
+            val = clean_text_value(m_sfc.group(1))
+            if val: site["Site Features Commentary"] = val
+
     # Broadband Internet
     m_bb = re.search(r"Broadband\s+Internet\s+Available\s*[:\-]?\s*([^\n\r]+)", site_text, re.I)
     if m_bb:
@@ -1033,10 +1058,22 @@ def extract_v1_site_section(doc, full_doc_text: str, summary: Dict[str, Any]) ->
     if re.search(r"Water[\s\S]*?(?:Public|✓|☑|X)", site_text, re.I):
         site["Water"] = "Public"
 
-    # Apparent Defects (Site)
-    m_def_site = re.search(r"Apparent\s+Defects,\s+Damages,\s+Deficiencies\s*\(Site\)\s*\n\s*([^\n\r]+)", site_text, re.I)
-    if m_def_site:
+    # Apparent Defects (Site) (e.g. "None", "None Observed", or narrative)
+    m_def_site = re.search(r"Apparent\s+Defects,\s+Damages,\s+Deficiencies\s*\(Site\)\s*[:\-]?\s*(?:\n\s*)?([^\n\r]+)", site_text, re.I)
+    if m_def_site and clean_text_value(m_def_site.group(1)) and not re.match(r"^(?:Site\s+Commentary|Energy|Highest|Renewable)", clean_text_value(m_def_site.group(1)), re.I):
         site["Apparent Defects, Damages, Deficiencies (Site)"] = clean_text_value(m_def_site.group(1))
+    else:
+        m_def_site_b = re.search(r"Apparent\s+Defects,\s+Damages,\s+Deficiencies\s*\(Site\)\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=Site\s+Commentary|Energy\s+Efficient|Highest\s+and\s+Best|\n\s*\n\s*[A-Z][a-z]+|\Z)", site_text, re.I)
+        if m_def_site_b and clean_text_value(m_def_site_b.group(1)):
+            site["Apparent Defects, Damages, Deficiencies (Site)"] = clean_text_value(m_def_site_b.group(1))
+
+    # Site Commentary
+    m_site_comm = re.search(r"Site\s+Commentary\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=Energy\s+Efficient|Renewable\s+Energy|Highest\s+and\s+Best|DWELLING\s+EXTERIOR|IMPROVEMENTS|\n\s*\n\s*[A-Z][a-z]+|\Z)", site_text, re.I) or \
+                  re.search(r"Site\s+Commentary\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=Energy\s+Efficient|Renewable\s+Energy|Highest\s+and\s+Best|DWELLING\s+EXTERIOR|IMPROVEMENTS|\n\s*\n\s*[A-Z][a-z]+|\Z)", full_doc_text, re.I)
+    if m_site_comm:
+        val_sc = clean_text_value(m_site_comm.group(1))
+        if val_sc:
+            site["Site Commentary"] = val_sc
 
     # Energy Efficient and Green Features (Solar, Financed, etc.)
     m_rec = re.search(r"Renewable\s+Energy\s+Components\s*[:\-]?\s*([^\n\r]+?)(?=\s+Ownership|\n|\Z)", site_text, re.I)
