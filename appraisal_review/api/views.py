@@ -23,6 +23,7 @@ from .pdf_extractor import (
 )
 from .pdf_extractor_offline import extract_fields_from_pdf_offline
 from .pdf_extractor_ecr_offline import extract_fields_from_pdf_ecr_offline
+from .pdf_extractor_v1_offline import extract_fields_from_pdf_v1_offline
 from .offline_requirement_checks import (
     evaluate_state_requirements,
     evaluate_unpaid_ok,
@@ -750,11 +751,21 @@ def extract_pdf(request):
                     if offline_data.get("status") == "success":
                         return Response(offline_data)
                 
+                if "VERSION" in form_type_str or "URAR" in form_type_str or form_type_str in ["APPRAISAL VERSION #1", "APPRAISAL VERSION #5", "VERSION 1", "VERSION 5"]:
+                    offline_data = extract_fields_from_pdf_v1_offline(tmp_path)
+                    if offline_data.get("status") == "success":
+                        return Response(offline_data)
+                
                 offline_data = extract_fields_from_pdf_offline(tmp_path)
                 if offline_data.get("status") == "success":
                     return Response(offline_data)
 
-                # Auto-fallback to ECR offline if Form 1004 did not match
+                # Auto-fallback to Version 1 / 5 URAR offline if Form 1004 did not match
+                offline_data = extract_fields_from_pdf_v1_offline(tmp_path)
+                if offline_data.get("status") == "success":
+                    return Response(offline_data)
+
+                # Auto-fallback to ECR offline if other forms did not match
                 offline_data = extract_fields_from_pdf_ecr_offline(tmp_path)
                 if offline_data.get("status") == "success":
                     return Response(offline_data)

@@ -241,11 +241,11 @@ def extract_fields_from_pdf_v1(pdf_path, category: str | None = None, custom_pro
     if not custom_prompt:
         try:
             try:
-                from api.pdf_extractor_offline import extract_fields_from_pdf_offline
+                from api.pdf_extractor_v1_offline import extract_fields_from_pdf_v1_offline
             except ImportError:
-                from .pdf_extractor_offline import extract_fields_from_pdf_offline  # type: ignore
+                from .pdf_extractor_v1_offline import extract_fields_from_pdf_v1_offline  # type: ignore
             
-            res: Any = extract_fields_from_pdf_offline(pdf_path)
+            res: Any = extract_fields_from_pdf_v1_offline(pdf_path)
             if isinstance(res, dict) and res.get("status") == "success":
                 fields = res.get("fields", {})
                 if category and isinstance(fields, dict):
@@ -270,6 +270,16 @@ def extract_fields_from_pdf_v1(pdf_path, category: str | None = None, custom_pro
                 return res
         except Exception as e:
             print(f"[Version #1] Offline extraction error: {e}")
+            try:
+                try:
+                    from api.pdf_extractor_offline import extract_fields_from_pdf_offline
+                except ImportError:
+                    from .pdf_extractor_offline import extract_fields_from_pdf_offline  # type: ignore
+                res_fallback = extract_fields_from_pdf_offline(pdf_path)
+                if isinstance(res_fallback, dict) and res_fallback.get("status") == "success":
+                    return res_fallback
+            except Exception:
+                pass
 
     combined_result = {}
     raw_responses = []

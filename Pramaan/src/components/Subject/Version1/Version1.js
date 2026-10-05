@@ -433,20 +433,26 @@ const Version1 = ({
               <TableBody>
                 <TableRow hover>
                   <TableCell sx={{ py: 0.5 }}>
-                    <EditableField fieldPath={['SITE', 'Site Feature']} value={data.SITE?.['Site Feature'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} manualValidations={manualValidations} handleManualValidation={handleManualValidation} revisionHandlers={revisionHandlers} showBlankValidation={extractionAttempted} />
+                    <EditableField fieldPath={['SITE', 'Site Feature']} value={data.SITE?.['Site Feature'] || data['Site Feature'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} manualValidations={manualValidations} handleManualValidation={handleManualValidation} revisionHandlers={revisionHandlers} showBlankValidation={extractionAttempted} />
                   </TableCell>
                   <TableCell sx={{ py: 0.5 }}>
-                    <EditableField fieldPath={['SITE', 'Site Feature Detail']} value={data.SITE?.['Site Feature Detail'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} manualValidations={manualValidations} handleManualValidation={handleManualValidation} revisionHandlers={revisionHandlers} showBlankValidation={extractionAttempted} />
+                    <EditableField fieldPath={['SITE', 'Site Feature Detail']} value={data.SITE?.['Site Feature Detail'] || data['Site Feature Detail'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} manualValidations={manualValidations} handleManualValidation={handleManualValidation} revisionHandlers={revisionHandlers} showBlankValidation={extractionAttempted} />
                   </TableCell>
                   <TableCell sx={{ py: 0.5 }}>
-                    <EditableField fieldPath={['SITE', 'Site Feature Impact']} value={data.SITE?.['Site Feature Impact'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} manualValidations={manualValidations} handleManualValidation={handleManualValidation} revisionHandlers={revisionHandlers} showBlankValidation={extractionAttempted} />
+                    <EditableField fieldPath={['SITE', 'Site Feature Impact']} value={data.SITE?.['Site Feature Impact'] || data['Site Feature Impact'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} manualValidations={manualValidations} handleManualValidation={handleManualValidation} revisionHandlers={revisionHandlers} showBlankValidation={extractionAttempted} />
                   </TableCell>
                   <TableCell sx={{ py: 0.5 }}>
-                    <EditableField fieldPath={['SITE', 'Site Feature Comment']} value={data.SITE?.['Site Feature Comment'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} manualValidations={manualValidations} handleManualValidation={handleManualValidation} revisionHandlers={revisionHandlers} showBlankValidation={extractionAttempted} />
+                    <EditableField fieldPath={['SITE', 'Site Feature Comment']} value={data.SITE?.['Site Feature Comment'] || data['Site Feature Comment'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} manualValidations={manualValidations} handleManualValidation={handleManualValidation} revisionHandlers={revisionHandlers} showBlankValidation={extractionAttempted} />
                   </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
+            <Box sx={{ p: 2, borderTop: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ minWidth: '170px' }}>Site Features Commentary:</Typography>
+              <Box sx={{ flexGrow: 1 }}>
+                <EditableField fieldPath={['SITE', 'Site Features Commentary']} value={data.SITE?.['Site Features Commentary'] || data['Site Features Commentary'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} manualValidations={manualValidations} handleManualValidation={handleManualValidation} revisionHandlers={revisionHandlers} showBlankValidation={extractionAttempted} />
+              </Box>
+            </Box>
           </TableContainer>
 
           <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1, overflow: 'hidden' }}>
@@ -832,41 +838,48 @@ const Version1 = ({
                 </TableRow>
               </TableHead>
               <TableBody>
-                {[1, 2, 3].map(rowIdx => {
-                  const roomKey = `Kitchen/Bath Row ${rowIdx} Room`;
-                  const statusKey = `Kitchen/Bath Row ${rowIdx} Update Status`;
-                  const tfKey = `Kitchen/Bath Row ${rowIdx} Time Frame`;
-                  const qCommentKey = `Kitchen/Bath Row ${rowIdx} Quality Comment`;
-                  const cStatusKey = `Kitchen/Bath Row ${rowIdx} Condition Status`;
-                  const cCommentKey = `Kitchen/Bath Row ${rowIdx} Condition Comment`;
+                {(() => {
+                  const indices = new Set([1, 2, 3]);
+                  Object.keys(data || {}).forEach(k => {
+                    const m = k.match(/^Kitchen\/Bath Row (\d+) Room$/);
+                    if (m) indices.add(parseInt(m[1], 10));
+                  });
+                  return Array.from(indices).sort((a, b) => a - b).map(rowIdx => {
+                    const roomKey = `Kitchen/Bath Row ${rowIdx} Room`;
+                    const statusKey = `Kitchen/Bath Row ${rowIdx} Update Status`;
+                    const tfKey = `Kitchen/Bath Row ${rowIdx} Time Frame`;
+                    const qCommentKey = `Kitchen/Bath Row ${rowIdx} Quality Comment`;
+                    const cStatusKey = `Kitchen/Bath Row ${rowIdx} Condition Status`;
+                    const cCommentKey = `Kitchen/Bath Row ${rowIdx} Condition Comment`;
 
-                  if (rowIdx > 1 && !data[roomKey] && !data[statusKey] && !data[tfKey] && !data[qCommentKey] && !data[cStatusKey] && !data[cCommentKey] && editingField !== roomKey) {
-                    return null;
-                  }
+                    if (rowIdx > 1 && !data[roomKey] && !data[statusKey] && !data[tfKey] && !data[qCommentKey] && !data[cStatusKey] && !data[cCommentKey] && editingField !== roomKey) {
+                      return null;
+                    }
 
-                  return (
-                    <TableRow key={rowIdx} hover>
-                      <TableCell sx={{ py: 0.5 }}>
-                        <EditableField fieldPath={[roomKey]} value={data[roomKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder={rowIdx === 1 ? "e.g. Kitchen Level 1" : "e.g. Bath - Full Level 1"} />
-                      </TableCell>
-                      <TableCell sx={{ py: 0.5 }}>
-                        <EditableField fieldPath={[statusKey]} value={data[statusKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="e.g. Partially Updated" />
-                      </TableCell>
-                      <TableCell sx={{ py: 0.5 }}>
-                        <EditableField fieldPath={[tfKey]} value={data[tfKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="e.g. 5-10 Years" />
-                      </TableCell>
-                      <TableCell sx={{ py: 0.5 }}>
-                        <EditableField fieldPath={[qCommentKey]} value={data[qCommentKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} showBlankValidation={extractionAttempted} />
-                      </TableCell>
-                      <TableCell sx={{ py: 0.5 }}>
-                        <EditableField fieldPath={[cStatusKey]} value={data[cStatusKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="e.g. Typical Wear & Tear" />
-                      </TableCell>
-                      <TableCell sx={{ py: 0.5 }}>
-                        <EditableField fieldPath={[cCommentKey]} value={data[cCommentKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} showBlankValidation={extractionAttempted} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                    return (
+                      <TableRow key={rowIdx} hover>
+                        <TableCell sx={{ py: 0.5 }}>
+                          <EditableField fieldPath={[roomKey]} value={data[roomKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder={rowIdx === 1 ? "e.g. Kitchen Level 1" : "e.g. Bath - Full Level 1"} />
+                        </TableCell>
+                        <TableCell sx={{ py: 0.5 }}>
+                          <EditableField fieldPath={[statusKey]} value={data[statusKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="e.g. Partially Updated" />
+                        </TableCell>
+                        <TableCell sx={{ py: 0.5 }}>
+                          <EditableField fieldPath={[tfKey]} value={data[tfKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="e.g. 5-10 Years" />
+                        </TableCell>
+                        <TableCell sx={{ py: 0.5 }}>
+                          <EditableField fieldPath={[qCommentKey]} value={data[qCommentKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} showBlankValidation={extractionAttempted} />
+                        </TableCell>
+                        <TableCell sx={{ py: 0.5 }}>
+                          <EditableField fieldPath={[cStatusKey]} value={data[cStatusKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="e.g. Typical Wear & Tear" />
+                        </TableCell>
+                        <TableCell sx={{ py: 0.5 }}>
+                          <EditableField fieldPath={[cCommentKey]} value={data[cCommentKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} showBlankValidation={extractionAttempted} />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  });
+                })()}
               </TableBody>
             </Table>
             <Box sx={{ p: 2, borderTop: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -894,7 +907,8 @@ const Version1 = ({
               <TableBody>
                 {[
                   { label: 'Flooring', valueKey: 'Flooring' },
-                  { label: 'Walls and Ceiling', valueKey: 'Walls and Ceiling' }
+                  { label: 'Walls and Ceiling', valueKey: 'Walls and Ceiling' },
+                  ...((data['Bath Floor Detail'] || data['Bath Floor Condition Status']) ? [{ label: 'Bath Floor', valueKey: 'Bath Floor' }] : [])
                 ].map(feature => {
                   const detailKey = `${feature.valueKey} Detail`;
                   const qCommentKey = `${feature.valueKey} Quality Comment`;
@@ -1163,6 +1177,198 @@ const Version1 = ({
             ))}
           </div>
 
+        </Box>
+      </Paper>
+
+      <Paper id="project-info-section" elevation={3} sx={{ mb: 4, borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: '#334155' }}>
+        <Box sx={{ bgcolor: '#334155', color: 'white', px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="subtitle1" fontWeight="bold">Project Information</Typography>
+        </Box>
+
+        <Box sx={{ p: 2, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Typography variant="subtitle2" fontWeight="bold" sx={{ color: '#1e293b' }}>Project Type:</Typography>
+          {[
+            'Planned Unit Development (PUD)',
+            'Condominium',
+            'Cooperative',
+            'Condop'
+          ].map(cb => {
+            const isChecked = (data.PROJECT_INFO?.[cb] || data[cb] || '').toLowerCase() === 'yes';
+            return (
+              <Box key={cb} sx={{ display: 'flex', alignItems: 'center' }}>
+                <Checkbox
+                  checked={isChecked}
+                  onChange={e => handleDataChange(['PROJECT_INFO', cb], e.target.checked ? 'Yes' : 'No')}
+                  size="small"
+                />
+                <Typography variant="body2" sx={{ fontWeight: isChecked ? 600 : 400 }}>{cb}</Typography>
+              </Box>
+            );
+          })}
+        </Box>
+
+        <Box sx={{ p: 2 }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1, color: '#334155' }}>General Project Info</Typography>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px 24px' }}>
+              <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', display: 'block' }}>Project Information Data Source</span>
+                <EditableField
+                  fieldPath={['PROJECT_INFO', 'Project Information Data Source']}
+                  value={data.PROJECT_INFO?.['Project Information Data Source'] || data['Project Information Data Source'] || ''}
+                  onDataChange={handleDataChange}
+                  editingField={editingField}
+                  setEditingField={setEditingField}
+                  isEditable={true}
+                  allData={allData}
+                  placeholder="e.g. Builder or Developer"
+                />
+              </div>
+            </div>
+          </Box>
+
+          <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 1.5, bgcolor: '#fcfcfc' }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5, color: '#1e293b' }}>Mandatory Fees (HOA, PUD, or Co-op)</Typography>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+              <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', display: 'block' }}>Monthly Amount</span>
+                <EditableField
+                  fieldPath={['PROJECT_INFO', 'Monthly Amount']}
+                  value={data.PROJECT_INFO?.['Monthly Amount'] || data['Monthly Amount'] || ''}
+                  onDataChange={handleDataChange}
+                  editingField={editingField}
+                  setEditingField={setEditingField}
+                  isEditable={true}
+                  allData={allData}
+                  placeholder="e.g. $250"
+                />
+              </div>
+              <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', display: 'block' }}>Common Amenities / Services Included</span>
+                <EditableField
+                  fieldPath={['PROJECT_INFO', 'Common Amenities / Services Included']}
+                  value={data.PROJECT_INFO?.['Common Amenities / Services Included'] || data['Common Amenities / Services Included'] || ''}
+                  onDataChange={handleDataChange}
+                  editingField={editingField}
+                  setEditingField={setEditingField}
+                  isEditable={true}
+                  allData={allData}
+                  placeholder="e.g. Clubhouse, Inground Pool"
+                />
+              </div>
+              <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', display: 'block' }}>Utilities Included</span>
+                <EditableField
+                  fieldPath={['PROJECT_INFO', 'Utilities Included']}
+                  value={data.PROJECT_INFO?.['Utilities Included'] || data['Utilities Included'] || ''}
+                  onDataChange={handleDataChange}
+                  editingField={editingField}
+                  setEditingField={setEditingField}
+                  isEditable={true}
+                  allData={allData}
+                  placeholder="e.g. None"
+                />
+              </div>
+            </div>
+          </Paper>
+
+          <TableContainer component={Paper} variant="outlined" sx={{ mb: 3, borderRadius: 1.5, overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: '#f1f5f9', px: 2, py: 1, borderBottom: '1px solid #cbd5e1' }}>
+              <Typography variant="subtitle2" fontWeight="bold">Project Factors and Impact to Value/Marketability</Typography>
+            </Box>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.8rem', py: 1, width: '220px' }}>Project Factor</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.8rem', py: 1, width: '120px' }}>Detail</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.8rem', py: 1, width: '140px' }}>Impact</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.8rem', py: 1 }}>Comment</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {[
+                  { label: 'Developer/Sponsor in Control', key: 'Developer/Sponsor in Control' },
+                  { label: 'Known Legal Actions', key: 'Known Legal Actions' },
+                  { label: 'Unit Special Assessments', key: 'Unit Special Assessments' },
+                  { label: 'Unit Tax Abatements or Exemptions', key: 'Unit Tax Abatements or Exemptions' }
+                ].map(factor => {
+                  const detKey = `${factor.key} Detail`;
+                  const impKey = `${factor.key} Impact`;
+                  const comKey = `${factor.key} Comment`;
+
+                  return (
+                    <TableRow key={factor.key} hover>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{factor.label}</TableCell>
+                      <TableCell sx={{ py: 0.5 }}>
+                        <EditableField
+                          fieldPath={['PROJECT_INFO', detKey]}
+                          value={data.PROJECT_INFO?.[detKey] || data[detKey] || ''}
+                          onDataChange={handleDataChange}
+                          editingField={editingField}
+                          setEditingField={setEditingField}
+                          isEditable={true}
+                          allData={allData}
+                          placeholder="e.g. Yes / None"
+                        />
+                      </TableCell>
+                      <TableCell sx={{ py: 0.5 }}>
+                        <EditableField
+                          fieldPath={['PROJECT_INFO', impKey]}
+                          value={data.PROJECT_INFO?.[impKey] || data[impKey] || ''}
+                          onDataChange={handleDataChange}
+                          editingField={editingField}
+                          setEditingField={setEditingField}
+                          isEditable={true}
+                          allData={allData}
+                          placeholder="e.g. Neutral"
+                        />
+                      </TableCell>
+                      <TableCell sx={{ py: 0.5 }}>
+                        <EditableField
+                          fieldPath={['PROJECT_INFO', comKey]}
+                          value={data.PROJECT_INFO?.[comKey] || data[comKey] || ''}
+                          onDataChange={handleDataChange}
+                          editingField={editingField}
+                          setEditingField={setEditingField}
+                          isEditable={true}
+                          allData={allData}
+                          placeholder="Comment"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 1.5 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Project Factors Commentary</Typography>
+            <EditableField
+              fieldPath={['PROJECT_INFO', 'Project Factors Commentary']}
+              value={data.PROJECT_INFO?.['Project Factors Commentary'] || data['Project Factors Commentary'] || ''}
+              onDataChange={handleDataChange}
+              editingField={editingField}
+              setEditingField={setEditingField}
+              isEditable={true}
+              allData={allData}
+              placeholder="Project Factors Commentary"
+            />
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Project Information Commentary</Typography>
+            <EditableField
+              fieldPath={['PROJECT_INFO', 'Project Information Commentary']}
+              value={data.PROJECT_INFO?.['Project Information Commentary'] || data['Project Information Commentary'] || ''}
+              onDataChange={handleDataChange}
+              editingField={editingField}
+              setEditingField={setEditingField}
+              isEditable={true}
+              allData={allData}
+              placeholder="Project Information Commentary"
+            />
+          </Paper>
         </Box>
       </Paper>
 

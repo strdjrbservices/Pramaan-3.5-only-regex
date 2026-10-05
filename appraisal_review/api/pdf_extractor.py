@@ -772,7 +772,8 @@ custom_checklist_schema = {
 def extract_fields_from_pdf(pdf_path, form_type: str, category: str | None = None, custom_prompt: str | None = None, prompt_type: str = "checklist"):
     # If custom_prompt is not provided, perform 100% offline extraction
     if not custom_prompt:
-        if form_type == "Appraisal Version #1":
+        form_type_clean = (form_type or "").strip()
+        if form_type_clean in ["Appraisal Version #1", "Appraisal Version #5", "Version 1", "Version 5", "URAR"] or "Appraisal Version" in form_type_clean or "VERSION" in form_type_clean.upper():
             from api.pdf_extractor_v1 import extract_fields_from_pdf_v1
             return extract_fields_from_pdf_v1(pdf_path, category=category, custom_prompt=None, prompt_type=prompt_type)
         if (form_type or "").strip().upper() in ["ECR", "ERC", "WORLDWIDE ERC"]:
