@@ -2739,13 +2739,77 @@ def extract_v1_cost_approach_section(doc, full_doc_text: str, summary: Dict[str,
     if m_osv:
         cost["Opinion of Site Value"] = f"${m_osv.group(1)}"
 
-    m_ag = re.search(r"Above\s+Grade\s+Finished\s+Area\s*[:\-]?\s*(?:\n\s*)?([\d,]+)", cost_text, re.I)
-    if m_ag:
-        cost["Above Grade Finished Area"] = f"{m_ag.group(1)} Sq. Ft."
+    # Dynamic Depreciated Cost - Dwelling table extraction (Above Grade Finished Area, Garage, Porch, Basement, etc.)
+    m_dcd_block = re.search(r"Depreciated\s+Cost\s*-\s*Dwelling([\s\S]*?)(?=Remaining\s+Economic\s+Life|Effective\s+Age|As\s+Is\s+Value|\n\s*\n\s*[A-Z][a-z]+|\Z)", cost_text, re.I)
+    if m_dcd_block:
+        block = m_dcd_block.group(1)
+        # 1. Total amount
+        m_tot = re.search(r"Total\s*[:\-]?\s*(?:\n\s*)?\$?([\d,]+)", block, re.I)
+        if m_tot:
+            cost["Depreciated Cost of Dwellings"] = f"${m_tot.group(1)}"
+            cost["Total Depreciation"] = f"${m_tot.group(1)}"
 
-    m_cpsf = re.search(r"@\s*\$?([\d\.]+)", cost_text, re.I)
-    if m_cpsf:
-        cost["Cost Per Square Foot"] = f"${m_cpsf.group(1)}"
+        # 2. Extract item rows (e.g. Above Grade Finished Area, Attached Garage, Porch;Scrn;Pat)
+        # Pattern: <Item Name> <Size> Sq. Ft. @ <Rate> <Amount>
+        item_matches = list(re.finditer(r"([A-Za-z0-9\s;,\./\-]+?)\s+([\d,]+)\s+Sq\.\s*Ft\.\s*@\s*\$?([\d\.]+)\s+\$?([\d,]+)", block, re.I))
+        for idx, im in enumerate(item_matches):
+            row_num = idx + 1
+            lbl = clean_text_value(im.group(1))
+            sz = f"{im.group(2)} Sq. Ft."
+            rt = f"${im.group(3)}"
+            amt = f"${im.group(4)}"
+            
+            cost[f"Dwelling Cost Item {row_num} Description"] = lbl
+            cost[f"Dwelling Cost Item {row_num} Size"] = sz
+            cost[f"Dwelling Cost Item {row_num} Rate"] = rt
+            cost[f"Dwelling Cost Item {row_num} Amount"] = amt
+
+            if "above grade" in lbl.lower() or idx == 0:
+                cost["Above Grade Finished Area"] = sz
+                cost["Cost Per Square Foot"] = rt
+                cost["Depreciated Cost"] = amt
+
+        # 3. Extract Depreciation rows (Physical, Functional, External)
+        m_phys = re.search(r"Physical\s+Depreciation\s*[:\-]?\s*([\d\.]+%?)\s*(?:\n\s*)?\$?\s*\(?([\d,]+)\)?", block, re.I) or \
+                 re.search(r"Physical\s+Depreciation\s*[:\-]?\s*([\d\.]+%?)", block, re.I)
+        if m_phys:
+            cost["Physical Depreciation"] = m_phys.group(1) if "%" in m_phys.group(1) else f"{m_phys.group(1)}%"
+            if m_phys.lastindex and m_phys.lastindex >= 2 and m_phys.group(2):
+                cost["Physical Depreciation Amount"] = f"${m_phys.group(2)}"
+        
+        m_phys_amt = re.search(r"Physical\s+Depreciation[\s\S]*?\$?\s*\(\$?([\d,]+)\)", block, re.I)
+        if m_phys_amt:
+            cost["Physical Depreciation Amount"] = f"${m_phys_amt.group(1)}"
+
+        m_func = re.search(r"Functional\s+Depreciation\s*[:\-]?\s*([\d\.]+%?)\s*(?:\n\s*)?\$?\s*\(?([\d,]+)\)?", block, re.I) or \
+                 re.search(r"Functional\s+Depreciation\s*[:\-]?\s*([\d\.]+%?)", block, re.I)
+        if m_func:
+            cost["Functional Depreciation"] = m_func.group(1) if "%" in m_func.group(1) else f"{m_func.group(1)}%"
+            if m_func.lastindex and m_func.lastindex >= 2 and m_func.group(2):
+                cost["Functional Depreciation Amount"] = f"${m_func.group(2)}"
+
+        m_ext = re.search(r"External\s+Depreciation\s*[:\-]?\s*([\d\.]+%?)\s*(?:\n\s*)?\$?\s*\(?([\d,]+)\)?", block, re.I) or \
+                re.search(r"External\s+Depreciation\s*[:\-]?\s*([\d\.]+%?)", block, re.I)
+        if m_ext:
+            cost["External Depreciation"] = m_ext.group(1) if "%" in m_ext.group(1) else f"{m_ext.group(1)}%"
+            if m_ext.lastindex and m_ext.lastindex >= 2 and m_ext.group(2):
+                cost["External Depreciation Amount"] = f"${m_ext.group(2)}"
+
+    if not cost.get("Above Grade Finished Area"):
+        m_ag = re.search(r"Above\s+Grade\s+Finished\s+Area\s*[:\-]?\s*(?:\n\s*)?([\d,]+)", cost_text, re.I)
+        if m_ag:
+            cost["Above Grade Finished Area"] = f"{m_ag.group(1)} Sq. Ft."
+
+    if not cost.get("Cost Per Square Foot"):
+        m_cpsf = re.search(r"@\s*\$?([\d\.]+)", cost_text, re.I)
+        if m_cpsf:
+            cost["Cost Per Square Foot"] = f"${m_cpsf.group(1)}"
+
+    if not cost.get("Depreciated Cost of Dwellings"):
+        m_dcd = re.search(r"Depreciated\s+Cost\s+of\s+Dwellings\s*[:\-]?\s*(?:\n\s*)?\$?([\d,]+)", cost_text, re.I)
+        if m_dcd:
+            cost["Depreciated Cost of Dwellings"] = f"${m_dcd.group(1)}"
+            cost["Depreciated Cost"] = f"${m_dcd.group(1)}"
 
     # Remaining Economic Life (excluding Commentary title)
     for m in re.finditer(r"(?:^|\n)\s*Remaining\s+Economic\s+Life\s*[:\-]?\s*(?:\n\s*)?([^\n\r]+)", cost_text, re.I):

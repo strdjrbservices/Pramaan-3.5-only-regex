@@ -1786,18 +1786,52 @@ const Version1 = ({
                 </TableRow>
               </TableHead>
               <TableBody>
+                {/* 1. Above Grade Finished Area (Row 1) */}
                 <TableRow hover>
-                  <TableCell sx={{ fontWeight: 'bold', py: 0.5 }}>Above Grade Finished Area</TableCell>
-                  <TableCell sx={{ py: 0.5 }}>
-                    <EditableField fieldPath={['Above Grade Finished Area']} value={data['Above Grade Finished Area'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="1,492 Sq. Ft." />
+                  <TableCell sx={{ fontWeight: 'bold', py: 0.5 }}>
+                    {data['Dwelling Cost Item 1 Description'] || 'Above Grade Finished Area'}
                   </TableCell>
                   <TableCell sx={{ py: 0.5 }}>
-                    <EditableField fieldPath={['Cost Per Square Foot']} value={data['Cost Per Square Foot'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="$151.31" />
+                    <EditableField fieldPath={['Above Grade Finished Area']} value={data['Above Grade Finished Area'] || data['Dwelling Cost Item 1 Size'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="1,492 Sq. Ft." />
                   </TableCell>
                   <TableCell sx={{ py: 0.5 }}>
-                    <EditableField fieldPath={['Depreciated Cost']} value={data['Depreciated Cost'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="$225,755" />
+                    <EditableField fieldPath={['Cost Per Square Foot']} value={data['Cost Per Square Foot'] || data['Dwelling Cost Item 1 Rate'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="$151.31" />
+                  </TableCell>
+                  <TableCell sx={{ py: 0.5 }}>
+                    <EditableField fieldPath={['Depreciated Cost']} value={data['Depreciated Cost'] || data['Dwelling Cost Item 1 Amount'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="$225,755" />
                   </TableCell>
                 </TableRow>
+
+                {/* 2. Additional dynamic dwelling cost items (e.g. Attached Garage, Porch;Scrn;Pat, Finished Basement, etc.) */}
+                {[2, 3, 4, 5, 6].map(rowIdx => {
+                  const descKey = `Dwelling Cost Item ${rowIdx} Description`;
+                  const sizeKey = `Dwelling Cost Item ${rowIdx} Size`;
+                  const rateKey = `Dwelling Cost Item ${rowIdx} Rate`;
+                  const amtKey = `Dwelling Cost Item ${rowIdx} Amount`;
+
+                  if (!data[descKey] && !data[sizeKey] && !data[rateKey] && !data[amtKey] && editingField !== descKey) {
+                    return null;
+                  }
+
+                  return (
+                    <TableRow key={rowIdx} hover>
+                      <TableCell sx={{ fontWeight: 'bold', py: 0.5 }}>
+                        <EditableField fieldPath={[descKey]} value={data[descKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="e.g. Attached Garage" />
+                      </TableCell>
+                      <TableCell sx={{ py: 0.5 }}>
+                        <EditableField fieldPath={[sizeKey]} value={data[sizeKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="508 Sq. Ft." />
+                      </TableCell>
+                      <TableCell sx={{ py: 0.5 }}>
+                        <EditableField fieldPath={[rateKey]} value={data[rateKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="$48" />
+                      </TableCell>
+                      <TableCell sx={{ py: 0.5 }}>
+                        <EditableField fieldPath={[amtKey]} value={data[amtKey] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="$24,384" />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+
+                {/* 3. Depreciation Rows (Physical, Functional, External) */}
                 {[
                   { label: 'Physical Depreciation', rateKey: 'Physical Depreciation', amtKey: 'Physical Depreciation Amount' },
                   { label: 'Functional Depreciation', rateKey: 'Functional Depreciation', amtKey: 'Functional Depreciation Amount' },
@@ -1815,12 +1849,13 @@ const Version1 = ({
                   </TableRow>
                 ))}
 
+                {/* 4. Total Row */}
                 <TableRow sx={{ bgcolor: '#fafafa' }}>
                   <TableCell sx={{ fontWeight: 'bold', py: 1 }}>Total</TableCell>
                   <TableCell sx={{ py: 1 }}></TableCell>
                   <TableCell sx={{ py: 1 }}></TableCell>
                   <TableCell sx={{ py: 1, fontWeight: 'bold' }}>
-                    <EditableField fieldPath={['Depreciated Cost of Dwellings']} value={data['Depreciated Cost of Dwellings'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="$225,755" />
+                    <EditableField fieldPath={['Depreciated Cost of Dwellings']} value={data['Depreciated Cost of Dwellings'] || data['Total Depreciation'] || ''} onDataChange={handleDataChange} editingField={editingField} setEditingField={setEditingField} isEditable={true} allData={allData} placeholder="$494,481" />
                   </TableCell>
                 </TableRow>
               </TableBody>
