@@ -1414,9 +1414,11 @@ def extract_v1_improvements_section(doc, full_doc_text: str, summary: Dict[str, 
         "Heating Fuel": "",
         "Cooling System": "",
         "Core Heating System Below Grade": "",
+        "Other Mechanical Systems": "",
         "Exterior Features": "",
         "Dwelling Exterior Exhibits": "",
         "Apparent Defects, Damages, Deficiencies (Dwelling Exterior)": "",
+        "Dwelling Exterior Commentary": "",
         "Overall Quality": summary.get("Overall Quality", ""),
         "Overall Condition": summary.get("Overall Condition", ""),
         "Finished Above Grade": "",
@@ -1519,6 +1521,14 @@ def extract_v1_improvements_section(doc, full_doc_text: str, summary: Dict[str, 
                 re.search(r"Apparent\s+Defects,?\s*Damages,?\s*Deficiencies\s*\(Dwelling\s+Exterior\)\s*[:\-]?\s*([^\n\r]+)", dw_text, re.I)
     if m_def_ext:
         imp["Apparent Defects, Damages, Deficiencies (Dwelling Exterior)"] = clean_text_value(m_def_ext.group(1))
+
+    # Dwelling Exterior Commentary
+    m_dec = re.search(r"Dwelling\s+Exterior\s+Commentary\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=Unit\s+Interior|Finished\s+Above|Quality\s+and\s+Condition|\n\s*\n\s*[A-Z][a-z]+|\Z)", dw_text, re.I) or \
+            re.search(r"Dwelling\s+Exterior\s+Commentary\s*[:\-]?\s*(?:\n\s*)?([\s\S]*?)(?=Unit\s+Interior|Finished\s+Above|Quality\s+and\s+Condition|\n\s*\n\s*[A-Z][a-z]+|\Z)", full_doc_text, re.I)
+    if m_dec:
+        val_dec = clean_text_value(m_dec.group(1))
+        if val_dec:
+            imp["Dwelling Exterior Commentary"] = val_dec
 
     # Finished Above Grade (from Sketch / Living Area Calculations or Unit Interior)
     m_gla_sketch = re.search(r"Total\s+Living\s+Area\s*\(Rounded\)\s*[:\-]?\s*([\d,]+)\s*(?:Sq\s*ft)?", dw_text, re.I) or \

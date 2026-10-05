@@ -835,34 +835,70 @@ const Version1 = ({
               </Table>
             </TableContainer>
 
-            <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRadius: 1 }}>
-              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2 }}>Core Heating System Below Grade</Typography>
-              <Box sx={{ display: 'flex', gap: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Checkbox
-                    size="small"
-                    checked={String(data['Core Heating System Below Grade']).toLowerCase() === 'yes' || data['Core Heating System Below Grade'] === true}
-                    onChange={(e) => handleDataChange(['Core Heating System Below Grade'], e.target.checked ? 'Yes' : 'No')}
-                  />
-                  <Typography variant="body2" fontWeight="medium">Yes</Typography>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Checkbox
-                    size="small"
-                    checked={String(data['Core Heating System Below Grade']).toLowerCase() === 'no' || data['Core Heating System Below Grade'] === false}
-                    onChange={(e) => handleDataChange(['Core Heating System Below Grade'], e.target.checked ? 'No' : 'Yes')}
-                  />
-                  <Typography variant="body2" fontWeight="medium">No</Typography>
-                </div>
-              </Box>
+            <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRadius: 1 }}>
+              <div>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>Core Heating System Below Grade</Typography>
+                <Box sx={{ display: 'flex', gap: '24px', mb: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Checkbox
+                      size="small"
+                      checked={String(data['Core Heating System Below Grade']).toLowerCase() === 'yes' || data['Core Heating System Below Grade'] === true}
+                      onChange={(e) => handleDataChange(['Core Heating System Below Grade'], e.target.checked ? 'Yes' : 'No')}
+                    />
+                    <Typography variant="body2" fontWeight="medium">Yes</Typography>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Checkbox
+                      size="small"
+                      checked={String(data['Core Heating System Below Grade']).toLowerCase() === 'no' || data['Core Heating System Below Grade'] === false}
+                      onChange={(e) => handleDataChange(['Core Heating System Below Grade'], e.target.checked ? 'No' : 'Yes')}
+                    />
+                    <Typography variant="body2" fontWeight="medium">No</Typography>
+                  </div>
+                </Box>
+              </div>
+
+              <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '10px' }}>
+                <Typography variant="caption" fontWeight="bold" sx={{ color: '#666', display: 'block', mb: 0.5 }}>Other Mechanical Systems</Typography>
+                <EditableField
+                  fieldPath={['Other Mechanical Systems']}
+                  value={data['Other Mechanical Systems'] || ''}
+                  onDataChange={handleDataChange}
+                  editingField={editingField}
+                  setEditingField={setEditingField}
+                  isEditable={true}
+                  allData={allData}
+                  manualValidations={manualValidations}
+                  handleManualValidation={handleManualValidation}
+                  revisionHandlers={revisionHandlers}
+                  placeholder="e.g. Water Heater"
+                />
+              </div>
             </Paper>
           </div>
 
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
+          <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 1 }}>
             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Apparent Defects, Damages, Deficiencies (Dwelling Exterior)</Typography>
             <EditableField
               fieldPath={['Apparent Defects, Damages, Deficiencies (Dwelling Exterior)']}
               value={data['Apparent Defects, Damages, Deficiencies (Dwelling Exterior)'] || ''}
+              onDataChange={handleDataChange}
+              editingField={editingField}
+              setEditingField={setEditingField}
+              isEditable={true}
+              allData={allData}
+              manualValidations={manualValidations}
+              handleManualValidation={handleManualValidation}
+              revisionHandlers={revisionHandlers}
+              showBlankValidation={extractionAttempted}
+            />
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>Dwelling Exterior Commentary</Typography>
+            <EditableField
+              fieldPath={['Dwelling Exterior Commentary']}
+              value={data['Dwelling Exterior Commentary'] || data.IMPROVEMENTS?.['Dwelling Exterior Commentary'] || ''}
               onDataChange={handleDataChange}
               editingField={editingField}
               setEditingField={setEditingField}
