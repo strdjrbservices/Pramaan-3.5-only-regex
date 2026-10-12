@@ -770,15 +770,15 @@ def extract_pdf(request):
                 if offline_data.get("status") == "success":
                     return Response(offline_data)
             else:
-                prompt_lower = str(custom_prompt).lower()
-                if "state-specific requirements" in prompt_lower or "appraiser’s fee disclosure" in prompt_lower or "appraiser's fee disclosure" in prompt_lower:
+                prompt_lower = str(custom_prompt or "").lower()
+                if any(term in prompt_lower for term in ["client requirement", "client-specific", "client specific", "lender/client", "lenders/clients", "bpl mortgage", "visio lending", "ice lender", "equity wave"]):
+                    res_offline = evaluate_client_requirements(tmp_path)
+                    return Response(res_offline)
+                elif any(term in prompt_lower for term in ["state-specific", "state specific", "state requirement", "state req", "appraiser’s fee disclosure", "appraiser's fee disclosure", "fee disclosure", "amc license", "amc #", "1455.245"]):
                     res_offline = evaluate_state_requirements(tmp_path)
                     return Response(res_offline)
                 elif "unpaid ok" in prompt_lower or ("unpaid" in prompt_lower and "lender" in prompt_lower):
                     res_offline = evaluate_unpaid_ok(tmp_path)
-                    return Response(res_offline)
-                elif "client requirement" in prompt_lower or "client-specific requirement" in prompt_lower or "bpl mortgage" in prompt_lower:
-                    res_offline = evaluate_client_requirements(tmp_path)
                     return Response(res_offline)
                 elif "accessory dwelling unit" in prompt_lower or "adu requirements" in prompt_lower or "adu" in prompt_lower:
                     res_offline = evaluate_adu_requirements(tmp_path)

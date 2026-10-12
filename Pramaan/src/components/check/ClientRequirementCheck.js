@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 
 export const CLIENT_REQUIREMENT_PROMPT = `
+Client Requirement Check:
 Based on the Lender/Client name in the document, verify if it matches any of a list of lenders/clients and check for any specific requirements.
 Your output must be a single, clean JSON object. Do not include any text outside of the JSON object.
 The JSON object must have a "summary" (a one to two-line overview stating which lender/client is present and if their requirements are met) and a "details" array.
