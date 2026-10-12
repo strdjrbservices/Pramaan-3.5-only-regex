@@ -1,6 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import {
+  Box,
   Button,
+  ButtonGroup,
   CircularProgress,
   Paper,
   Typography,
@@ -18,6 +20,10 @@ import {
   Select,
   MenuItem
 } from '@mui/material';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import CodeIcon from '@mui/icons-material/Code';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
 export const ESCALATION_RULES = [
   { id: 1, requirement: "Assignment Type Mismatch", ruleText: "1. Assignment Type Mismatch: If order form indicates ‘Purchase’ but report is marked ‘Refinance’, or vice-versa." },
@@ -56,19 +62,22 @@ Each object in the "details" array represents a rule check and must have the fol
 - "status": 'OK' if the rule is satisfied/passed, or 'Needs Escalation' if it fails/requires review.
 - "value_or_comment": A string containing a brief comment explaining the finding (e.g., confirming consistency or describing any mismatch), along with the page number.
 
+IMPORTANT INSTRUCTION FOR ORDER FORM / ENGAGEMENT LETTER:
+If an order form or engagement letter is NOT included or provided in the report, do NOT mark Rules 1, 2, 3, 5, 8, 11, or 12 as 'Needs Escalation'. Instead, mark their status as 'OK' and comment 'Order form not provided in report; verified internal report consistency.'
+
 Escalation Rules:
-1. Assignment Type Mismatch: If order form indicates ‘Purchase’ but report is marked ‘Refinance’, or vice-versa.
-2. Appraisal Type Mismatch: If order form shows '1004+1007' but report is '1025'.
-3. Appraiser Mismatch: If order form appraiser name differs from the completing appraiser in the report.
+1. Assignment Type Mismatch: If order form indicates ‘Purchase’ but report is marked ‘Refinance’, or vice-versa. (If order form not provided: verify internal report consistency as OK).
+2. Appraisal Type Mismatch: If order form shows '1004+1007' but report is '1025'. (If order form not provided: verify report form as OK).
+3. Appraiser Mismatch: If order form appraiser name differs from the completing appraiser in the report. (If order form not provided: verify appraiser signature as OK).
 4. Repairs vs. As-Is: If photos or comments show multiple repairs but the report is made 'As-is'.
-5. Supervisory Appraiser Signature: If the appraiser on the order form signs as the supervisory appraiser.
+5. Supervisory Appraiser Signature: If the appraiser on the order form signs as the supervisory appraiser. (If order form not provided: verify supervisory signature role as OK).
 6. Missing Revisions: If latest revision requests are not reflected in the report.
 7. Lender/Client Name Change: If the lender/client name is changed in the report (e.g., from “Easy Street Capital” to “National Loan Funder”).
-8. Appraiser Fee Mismatch: If the appraiser’s fee in the report does not match the engagement letter.
+8. Appraiser Fee Mismatch: If the appraiser’s fee in the report does not match the engagement letter. (If engagement letter not provided: verify fee disclosure as OK).
 9. Neighborhood Condition Comment: If the Neighborhood section comment contains potentially negative words like "*average* condition".
 10. Value vs. Price: If the final value is 10% lower than list price, purchase price.
-11. 1004D Mismatch: If order form shows ‘1004D Final Inspection/Appraisal Update’ but report is only one of them, or vice-versa.
-12. Loan/Appraisal Type Conflict: If order form loan type (e.g., USDA) conflicts with appraisal type (e.g., 1004 FHA).
+11. 1004D Mismatch: If order form shows ‘1004D Final Inspection/Appraisal Update’ but report is only one of them, or vice-versa. (If order form not provided: verify as OK).
+12. Loan/Appraisal Type Conflict: If order form loan type (e.g., USDA) conflicts with appraisal type (e.g., 1004 FHA). (If order form not provided: verify as OK).
 13. Illegal Use: If the property is marked as 'Illegal'.
 14. Multiple Kitchens: If a 1004 report shows 3+ kitchens, check for comments on whether they are permitted.
 15. Inspection/Effective Date Mismatch: If inspection date from records differs from the report's effective date.
@@ -82,9 +91,10 @@ Escalation Rules:
 23. Physical Deficiencies 'YES' but 'As-Is': If 'Physical deficiencies' is marked 'YES' but the report is made 'as-is'.
 `;
 
-
 const EscalationCheck = ({ onPromptSubmit, loading, response, error }) => {
   const [filterValue, setFilterValue] = useState('all');
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'json'
+  const [copied, setCopied] = useState(false);
 
   const handleCheck = () => {
     onPromptSubmit(ESCALATION_CHECK_PROMPT);
@@ -102,11 +112,16 @@ const EscalationCheck = ({ onPromptSubmit, loading, response, error }) => {
       }
     }
 
+    if (data && !data.details) {
+      if (data.ESCALATION_CHECK) data = data.ESCALATION_CHECK;
+      else if (data.escalation_check) data = data.escalation_check;
+      else if (data['Escalation Check']) data = data['Escalation Check'];
+    }
+
     const summary = data?.summary ?? 'No summary available.';
     const rawDetails = Array.isArray(data?.details) ? data.details : [];
 
     const details = ESCALATION_RULES.map(rule => {
-
       const match = rawDetails.find(d => {
         if (!d) return false;
         if (d.rule_number !== undefined && String(d.rule_number) === String(rule.id)) {
@@ -131,7 +146,6 @@ const EscalationCheck = ({ onPromptSubmit, loading, response, error }) => {
         };
       }
     });
-
 
     const matchedBackendIndices = new Set();
     ESCALATION_RULES.forEach((rule) => {
@@ -165,9 +179,69 @@ const EscalationCheck = ({ onPromptSubmit, loading, response, error }) => {
       return greenStatuses.includes(normalized);
     };
 
+    const isRedOrReview = (status) => {
+      const normalized = String(status || '').trim().toLowerCase();
+      return ['needs escalation', 'escalation', 'failed', 'not fulfilled', 'needs review', 'no'].includes(normalized);
+    };
+
+    const getStatusStyle = (status) => {
+      const normalizedStatus = String(status || '').trim().toLowerCase();
+      const greenList = ['ok', 'pass', 'passed', 'fulfilled', 'yes'];
+      const redList = ['needs escalation', 'escalation', 'failed', 'not fulfilled', 'no'];
+      const yellowList = ['needs review', 'review', 'warning'];
+      const naList = ['not applicable', 'n/a', 'na'];
+
+      if (greenList.includes(normalizedStatus)) {
+        return {
+          backgroundColor: '#d4edda',
+          color: '#155724',
+          border: '1px solid #c3e6cb',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          display: 'inline-block'
+        };
+      } else if (redList.includes(normalizedStatus)) {
+        return {
+          backgroundColor: '#f8d7da',
+          color: '#721c24',
+          border: '1px solid #f5c6cb',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          display: 'inline-block'
+        };
+      } else if (yellowList.includes(normalizedStatus)) {
+        return {
+          backgroundColor: '#fff3cd',
+          color: '#856404',
+          border: '1px solid #ffeeba',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          display: 'inline-block'
+        };
+      } else if (naList.includes(normalizedStatus)) {
+        return {
+          backgroundColor: '#e9ecef',
+          color: '#495057',
+          border: '1px solid #ced4da',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          display: 'inline-block'
+        };
+      }
+      return {
+        padding: '4px 8px',
+        borderRadius: '4px',
+        display: 'inline-block'
+      };
+    };
+
     const filteredDetails = mergedDetails.filter(item => {
       if (filterValue === 'passed') return isGreen(item.status);
-      if (filterValue === 'failed') return !isGreen(item.status);
+      if (filterValue === 'failed') return isRedOrReview(item.status);
       return true;
     });
 
@@ -180,93 +254,179 @@ const EscalationCheck = ({ onPromptSubmit, loading, response, error }) => {
     });
 
     return (
-      <Stack spacing={3} sx={{ mt: 3 }}>
-        <Paper elevation={1} sx={{ p: 2, bgcolor: 'background.default' }}>
-          <Typography variant="h6" gutterBottom component="div" color="primary.main">Summary</Typography>
-          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{summary}</Typography>
-        </Paper>
+      <Stack spacing={2} sx={{ mt: 3 }}>
         <Paper elevation={1} sx={{ p: 2 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="h6" component="div" color="primary.main">Details</Typography>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel id="escalation-status-filter-label">Filter Status</InputLabel>
-              <Select
-                labelId="escalation-status-filter-label"
-                id="escalation-status-filter"
-                value={filterValue}
-                label="Filter Status"
-                onChange={(e) => setFilterValue(e.target.value)}
-              >
-                <MenuItem value="all">All</MenuItem>
-                <MenuItem value="passed">Passed / OK</MenuItem>
-                <MenuItem value="failed">Failed / Review</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Requirement</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Value / Comment</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {sortedDetails.length > 0 ? (sortedDetails.map((item, index) => {
-                  const isInvalid = item.status === 'Needs Escalation';
-                  const statusStyle = isInvalid
-                    ? { backgroundColor: '#ff0000', color: '#ffffff', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', cursor: 'pointer' }
-                    : { backgroundColor: '#91ff00ff', color: '#000000', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' };
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1.5} sx={{ mb: 2 }}>
+            <Typography variant="h6" component="div" color="error.main" display="flex" alignItems="center" gap={1}>
+              {viewMode === 'table' ? <TableChartIcon fontSize="small" /> : <CodeIcon fontSize="small" />}
+              {viewMode === 'table' ? 'Escalation Rules Breakdown' : 'Escalation Rules (Raw JSON)'}
+            </Typography>
 
-                  let tooltipContent = '';
-                  if (isInvalid) {
-                    if (typeof item.value_or_comment === 'object' && item.value_or_comment !== null) {
-                      tooltipContent = item.value_or_comment.value || JSON.stringify(item.value_or_comment);
-                    } else {
-                      tooltipContent = item.value_or_comment;
-                    }
-                  }
-                  return (
-                    <TableRow key={index}>
-                      <TableCell>{item.requirement}</TableCell>
-                      <TableCell>
-                        {isInvalid ? (
-                          <Tooltip title={tooltipContent} arrow>
-                            <span style={statusStyle}>{item.status}</span>
-                          </Tooltip>
-                        ) : (
-                          <span style={statusStyle}>{item.status}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {typeof item.value_or_comment === 'object' && item.value_or_comment !== null ? (
-                          <>
-                            {item.value_or_comment.value && (
-                              <Typography variant="body2">{item.value_or_comment.value}</Typography>
-                            )}
-                            {item.value_or_comment.page_no && (
-                              <Typography variant="caption" color="text.secondary">
-                                Page: {item.value_or_comment.page_no}
-                              </Typography>
-                            )}
-                          </>
-                        ) : (
-                          String(item.value_or_comment)
-                        )}
-                      </TableCell>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              {viewMode === 'table' && (
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <InputLabel id="escalation-status-filter-label">Filter Status</InputLabel>
+                  <Select
+                    labelId="escalation-status-filter-label"
+                    id="escalation-status-filter"
+                    value={filterValue}
+                    label="Filter Status"
+                    onChange={(e) => setFilterValue(e.target.value)}
+                  >
+                    <MenuItem value="all">All</MenuItem>
+                    <MenuItem value="passed">Passed / OK</MenuItem>
+                    <MenuItem value="failed">Failed / Review</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+
+              <ButtonGroup size="small" variant="outlined">
+                <Button
+                  variant={viewMode === 'table' ? 'contained' : 'outlined'}
+                  color="error"
+                  startIcon={<TableChartIcon fontSize="small" />}
+                  onClick={() => setViewMode('table')}
+                >
+                  Table View
+                </Button>
+                <Button
+                  variant={viewMode === 'json' ? 'contained' : 'outlined'}
+                  color="error"
+                  startIcon={<CodeIcon fontSize="small" />}
+                  onClick={() => setViewMode('json')}
+                >
+                  JSON View
+                </Button>
+              </ButtonGroup>
+
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<ContentCopyIcon fontSize="small" />}
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+              >
+                {copied ? 'Copied!' : 'Copy JSON'}
+              </Button>
+
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<FileDownloadIcon fontSize="small" />}
+                onClick={() => {
+                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'escalation_check.json';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Download JSON
+              </Button>
+            </Stack>
+          </Stack>
+
+          {viewMode === 'json' ? (
+            <Box
+              component="pre"
+              sx={{
+                m: 0,
+                p: 2.5,
+                borderRadius: 2,
+                backgroundColor: '#0d1117',
+                color: '#58a6ff',
+                fontFamily: 'Consolas, Monaco, monospace',
+                fontSize: '0.875rem',
+                lineHeight: 1.6,
+                maxHeight: '480px',
+                overflow: 'auto',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
+              }}
+            >
+              <code>{JSON.stringify(data, null, 2)}</code>
+            </Box>
+          ) : (
+            <>
+              {summary && (
+                <Paper elevation={0} sx={{ p: 2, mb: 2, bgcolor: 'background.default', borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
+                  <Typography variant="subtitle2" fontWeight={700} gutterBottom color="error.main">
+                    Summary
+                  </Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {summary}
+                  </Typography>
+                </Paper>
+              )}
+
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Requirement</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Value / Comment</TableCell>
                     </TableRow>
-                  )
-                })) : (
-                  <TableRow><TableCell colSpan={3} align="center">No matching items found.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {sortedDetails.length > 0 ? (sortedDetails.map((item, index) => {
+                      const isInvalid = ['needs escalation', 'escalation', 'failed', 'not fulfilled'].includes(String(item.status || '').toLowerCase());
+                      const statusStyle = getStatusStyle(item.status);
+
+                      let tooltipContent = '';
+                      if (isInvalid) {
+                        if (typeof item.value_or_comment === 'object' && item.value_or_comment !== null) {
+                          tooltipContent = item.value_or_comment.value || JSON.stringify(item.value_or_comment);
+                        } else {
+                          tooltipContent = item.value_or_comment;
+                        }
+                      }
+                      return (
+                        <TableRow key={index}>
+                          <TableCell>{item.requirement}</TableCell>
+                          <TableCell>
+                            {isInvalid ? (
+                              <Tooltip title={tooltipContent} arrow>
+                                <span style={statusStyle}>{item.status}</span>
+                              </Tooltip>
+                            ) : (
+                              <span style={statusStyle}>{item.status}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {typeof item.value_or_comment === 'object' && item.value_or_comment !== null ? (
+                              <>
+                                {item.value_or_comment.value && (
+                                  <Typography variant="body2">{item.value_or_comment.value}</Typography>
+                                )}
+                                {item.value_or_comment.page_no && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    Page: {item.value_or_comment.page_no}
+                                  </Typography>
+                                )}
+                              </>
+                            ) : (
+                              String(item.value_or_comment)
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })) : (
+                      <TableRow><TableCell colSpan={3} align="center">No matching items found.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
+          )}
         </Paper>
       </Stack>
     );
-  }, [response, filterValue]);
+  }, [response, filterValue, viewMode, copied]);
 
   return (
     <div id="escalation-check-section" className="card shadow mb-4">

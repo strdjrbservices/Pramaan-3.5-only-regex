@@ -1,6 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import {
+  Box,
   Button,
+  ButtonGroup,
   CircularProgress,
   Paper,
   Typography,
@@ -17,6 +19,10 @@ import {
   Select,
   MenuItem
 } from '@mui/material';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import CodeIcon from '@mui/icons-material/Code';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
 export const CLIENT_REQUIREMENT_PROMPT = `
 Client Requirement Check:
@@ -163,6 +169,8 @@ Lender/Client List and their requirements:
 
 const ClientRequirementCheck = ({ onPromptSubmit, loading, response, error }) => {
   const [filterValue, setFilterValue] = useState('all');
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'json'
+  const [copied, setCopied] = useState(false);
 
   const handleCheck = () => {
     onPromptSubmit(CLIENT_REQUIREMENT_PROMPT);
@@ -180,6 +188,12 @@ const ClientRequirementCheck = ({ onPromptSubmit, loading, response, error }) =>
       }
     }
 
+    if (data && !data.details) {
+      if (data.CLIENT_REQUIREMENT_CHECK) data = data.CLIENT_REQUIREMENT_CHECK;
+      else if (data.client_requirement_check) data = data.client_requirement_check;
+      else if (data['Client Requirement Check']) data = data['Client Requirement Check'];
+    }
+
     const summary = data?.summary ?? 'No summary available';
     const details = Array.isArray(data?.details) ? data.details : [];
 
@@ -193,13 +207,25 @@ const ClientRequirementCheck = ({ onPromptSubmit, loading, response, error }) =>
       const normalizedStatus = String(status || '').trim().toLowerCase();
       
       const greenStatuses = ['fulfilled', 'ok', 'yes', 'pass', 'passed'];
-      const redStatuses = ['not fulfilled', 'not applicable', 'failed', 'no'];
+      const yellowStatuses = ['needs review', 'review'];
+      const redStatuses = ['not fulfilled', 'failed', 'no'];
+      const naStatuses = ['not applicable', 'n/a', 'na'];
       
       if (greenStatuses.includes(normalizedStatus)) {
         return {
           backgroundColor: '#d4edda',
           color: '#155724',
           border: '1px solid #c3e6cb',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          display: 'inline-block'
+        };
+      } else if (yellowStatuses.includes(normalizedStatus)) {
+        return {
+          backgroundColor: '#fff3cd',
+          color: '#856404',
+          border: '1px solid #ffeeba',
           padding: '4px 8px',
           borderRadius: '4px',
           fontWeight: 'bold',
@@ -215,8 +241,22 @@ const ClientRequirementCheck = ({ onPromptSubmit, loading, response, error }) =>
           fontWeight: 'bold',
           display: 'inline-block'
         };
+      } else if (naStatuses.includes(normalizedStatus)) {
+        return {
+          backgroundColor: '#e9ecef',
+          color: '#495057',
+          border: '1px solid #ced4da',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          display: 'inline-block'
+        };
       }
-      return {};
+      return {
+        padding: '4px 8px',
+        borderRadius: '4px',
+        display: 'inline-block'
+      };
     };
 
     const isGreen = (status) => {
@@ -224,9 +264,14 @@ const ClientRequirementCheck = ({ onPromptSubmit, loading, response, error }) =>
       return ['fulfilled', 'ok', 'pass', 'passed', 'yes'].includes(normalized);
     };
 
+    const isRedOrReview = (status) => {
+      const normalized = String(status || '').trim().toLowerCase();
+      return ['not fulfilled', 'failed', 'needs review', 'review', 'no'].includes(normalized);
+    };
+
     const filteredDetails = details.filter(item => {
       if (filterValue === 'passed') return isGreen(item.status);
-      if (filterValue === 'failed') return !isGreen(item.status);
+      if (filterValue === 'failed') return isRedOrReview(item.status);
       return true;
     });
 
@@ -239,75 +284,152 @@ const ClientRequirementCheck = ({ onPromptSubmit, loading, response, error }) =>
     });
 
     return (
-      <Stack spacing={3} sx={{ mt: 3 }}>
-        {summary && (
-          <Paper elevation={1} sx={{ p: 2, bgcolor: 'background.default' }}>
-            <Typography variant="h6" gutterBottom component="div" color="primary.main">
-              Summary
+      <Stack spacing={2} sx={{ mt: 3 }}>
+        <Paper elevation={1} sx={{ p: 2 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1.5} sx={{ mb: 2 }}>
+            <Typography variant="h6" component="div" color="primary.main" display="flex" alignItems="center" gap={1}>
+              {viewMode === 'table' ? <TableChartIcon fontSize="small" /> : <CodeIcon fontSize="small" />}
+              {viewMode === 'table' ? 'Client Requirements Breakdown' : 'Client Requirements (Raw JSON)'}
             </Typography>
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-              {renderValue(summary)}
-            </Typography>
-          </Paper>
-        )}
-        {details.length > 0 && (
-          <Paper elevation={1} sx={{ p: 2 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-              <Typography variant="h6" component="div" color="primary.main">
-                Details
-              </Typography>
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel id="client-status-filter-label">Filter Status</InputLabel>
-                <Select
-                  labelId="client-status-filter-label"
-                  id="client-status-filter"
-                  value={filterValue}
-                  label="Filter Status"
-                  onChange={(e) => setFilterValue(e.target.value)}
+
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              {viewMode === 'table' && (
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <InputLabel id="client-status-filter-label">Filter Status</InputLabel>
+                  <Select
+                    labelId="client-status-filter-label"
+                    id="client-status-filter"
+                    value={filterValue}
+                    label="Filter Status"
+                    onChange={(e) => setFilterValue(e.target.value)}
+                  >
+                    <MenuItem value="all">All</MenuItem>
+                    <MenuItem value="passed">Passed / OK</MenuItem>
+                    <MenuItem value="failed">Failed / Review</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+
+              <ButtonGroup size="small" variant="outlined">
+                <Button
+                  variant={viewMode === 'table' ? 'contained' : 'outlined'}
+                  startIcon={<TableChartIcon fontSize="small" />}
+                  onClick={() => setViewMode('table')}
                 >
-                  <MenuItem value="all">All</MenuItem>
-                  <MenuItem value="passed">Passed / OK</MenuItem>
-                  <MenuItem value="failed">Failed / Review</MenuItem>
-                </Select>
-              </FormControl>
+                  Table View
+                </Button>
+                <Button
+                  variant={viewMode === 'json' ? 'contained' : 'outlined'}
+                  startIcon={<CodeIcon fontSize="small" />}
+                  onClick={() => setViewMode('json')}
+                >
+                  JSON View
+                </Button>
+              </ButtonGroup>
+
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<ContentCopyIcon fontSize="small" />}
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+              >
+                {copied ? 'Copied!' : 'Copy JSON'}
+              </Button>
+
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<FileDownloadIcon fontSize="small" />}
+                onClick={() => {
+                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'client_requirements.json';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Download JSON
+              </Button>
             </Stack>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Requirement</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Value / Comment</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {sortedDetails.length > 0 ? (
-                    sortedDetails.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{renderValue(item.requirement)}</TableCell>
-                        <TableCell>
-                          <span style={getStatusStyle(item.status)}>
-                            {renderValue(item.status)}
-                          </span>
-                        </TableCell>
-                        <TableCell>{renderValue(item.value_or_comment)}</TableCell>
+          </Stack>
+
+          {viewMode === 'json' ? (
+            <Box
+              component="pre"
+              sx={{
+                m: 0,
+                p: 2.5,
+                borderRadius: 2,
+                backgroundColor: '#0d1117',
+                color: '#58a6ff',
+                fontFamily: 'Consolas, Monaco, monospace',
+                fontSize: '0.875rem',
+                lineHeight: 1.6,
+                maxHeight: '480px',
+                overflow: 'auto',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
+              }}
+            >
+              <code>{JSON.stringify(data, null, 2)}</code>
+            </Box>
+          ) : (
+            <>
+              {summary && (
+                <Paper elevation={0} sx={{ p: 2, mb: 2, bgcolor: 'background.default', borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
+                  <Typography variant="subtitle2" fontWeight={700} gutterBottom color="primary.main">
+                    Summary
+                  </Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {renderValue(summary)}
+                  </Typography>
+                </Paper>
+              )}
+              {details.length > 0 && (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Requirement</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Value / Comment</TableCell>
                       </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={3} align="center">
-                        No matching items found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        )}
+                    </TableHead>
+                    <TableBody>
+                      {sortedDetails.length > 0 ? (
+                        sortedDetails.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{renderValue(item.requirement)}</TableCell>
+                            <TableCell>
+                              <span style={getStatusStyle(item.status)}>
+                                {renderValue(item.status)}
+                              </span>
+                            </TableCell>
+                            <TableCell>{renderValue(item.value_or_comment)}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={3} align="center">
+                            No matching items found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </>
+          )}
+        </Paper>
       </Stack>
     );
-  }, [response, filterValue]);
+  }, [response, filterValue, viewMode, copied]);
 
   return (
     <div id="client-requirement-check-section" className="card shadow mb-4">

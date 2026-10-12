@@ -745,43 +745,55 @@ def extract_pdf(request):
         try:
             category_clean = str(category or "").strip().upper()
             if category_clean in ["CLIENT_REQUIREMENT_CHECK", "CLIENT_REQUIREMENTS"]:
-                return Response(evaluate_client_requirements(tmp_path))
+                return Response(evaluate_client_requirements(tmp_path, form_type=form_type))
             elif category_clean in ["STATE_REQUIREMENT_CHECK", "STATE_REQUIREMENTS"]:
-                return Response(evaluate_state_requirements(tmp_path))
+                return Response(evaluate_state_requirements(tmp_path, form_type=form_type))
+            elif category_clean in ["ESCALATION_CHECK", "ESCALATION"]:
+                return Response(evaluate_escalation_check(tmp_path))
 
             form_type_str = str(form_type or "").strip().upper()
             if not custom_prompt:
                 # 100% Offline Pure Python Extraction (Fast & $0.00 cost)
+                offline_data = None
                 if form_type_str in ["ECR", "ERC", "WORLDWIDE ERC"]:
                     offline_data = extract_fields_from_pdf_ecr_offline(tmp_path)
-                    if offline_data.get("status") == "success":
-                        return Response(offline_data)
-                
-                if "VERSION" in form_type_str or "URAR" in form_type_str or form_type_str in ["APPRAISAL VERSION #1", "APPRAISAL VERSION #5", "VERSION 1", "VERSION 5"]:
+                elif "VERSION" in form_type_str or "URAR" in form_type_str or form_type_str in ["APPRAISAL VERSION #1", "APPRAISAL VERSION #5", "VERSION 1", "VERSION 5"]:
                     offline_data = extract_fields_from_pdf_v1_offline(tmp_path)
-                    if offline_data.get("status") == "success":
-                        return Response(offline_data)
-                
-                offline_data = extract_fields_from_pdf_offline(tmp_path)
-                if offline_data.get("status") == "success":
-                    return Response(offline_data)
+                else:
+                    offline_data = extract_fields_from_pdf_offline(tmp_path)
+                    if not (isinstance(offline_data, dict) and offline_data.get("status") == "success"):
+                        offline_data = extract_fields_from_pdf_v1_offline(tmp_path)
+                    if not (isinstance(offline_data, dict) and offline_data.get("status") == "success"):
+                        offline_data = extract_fields_from_pdf_ecr_offline(tmp_path)
 
-                # Auto-fallback to Version 1 / 5 URAR offline if Form 1004 did not match
-                offline_data = extract_fields_from_pdf_v1_offline(tmp_path)
-                if offline_data.get("status") == "success":
-                    return Response(offline_data)
-
-                # Auto-fallback to ECR offline if other forms did not match
-                offline_data = extract_fields_from_pdf_ecr_offline(tmp_path)
-                if offline_data.get("status") == "success":
+                if isinstance(offline_data, dict) and offline_data.get("status") == "success":
+                    if "fields" in offline_data and isinstance(offline_data["fields"], dict):
+                        try:
+                            offline_data["fields"]["STATE_REQUIREMENT_CHECK"] = evaluate_state_requirements(
+                                tmp_path, extracted_data=offline_data["fields"], form_type=form_type
+                            )
+                        except Exception as e:
+                            print(f"Error evaluating state requirements: {e}")
+                        try:
+                            offline_data["fields"]["CLIENT_REQUIREMENT_CHECK"] = evaluate_client_requirements(
+                                tmp_path, extracted_data=offline_data["fields"], form_type=form_type
+                            )
+                        except Exception as e:
+                            print(f"Error evaluating client requirements: {e}")
+                        try:
+                            offline_data["fields"]["ESCALATION_CHECK"] = evaluate_escalation_check(
+                                tmp_path, extracted_data=offline_data["fields"]
+                            )
+                        except Exception as e:
+                            print(f"Error evaluating escalation check: {e}")
                     return Response(offline_data)
             else:
                 prompt_lower = str(custom_prompt or "").lower()
                 if any(term in prompt_lower for term in ["client requirement", "client-specific", "client specific", "lender/client", "lenders/clients", "bpl mortgage", "visio lending", "ice lender", "equity wave"]):
-                    res_offline = evaluate_client_requirements(tmp_path)
+                    res_offline = evaluate_client_requirements(tmp_path, form_type=form_type)
                     return Response(res_offline)
                 elif any(term in prompt_lower for term in ["state-specific", "state specific", "state requirement", "state req", "appraiser’s fee disclosure", "appraiser's fee disclosure", "fee disclosure", "amc license", "amc #", "1455.245"]):
-                    res_offline = evaluate_state_requirements(tmp_path)
+                    res_offline = evaluate_state_requirements(tmp_path, form_type=form_type)
                     return Response(res_offline)
                 elif "unpaid ok" in prompt_lower or ("unpaid" in prompt_lower and "lender" in prompt_lower):
                     res_offline = evaluate_unpaid_ok(tmp_path)
@@ -805,14 +817,50 @@ def extract_pdf(request):
             if data.get("error"):
                 offline_fallback = extract_fields_from_pdf_offline(tmp_path)
                 if offline_fallback.get("status") == "success":
+                    if "fields" in offline_fallback and isinstance(offline_fallback["fields"], dict):
+                        try:
+                            offline_fallback["fields"]["STATE_REQUIREMENT_CHECK"] = evaluate_state_requirements(
+                                tmp_path, extracted_data=offline_fallback["fields"], form_type=form_type
+                            )
+                        except Exception as e:
+                            pass
+                        try:
+                            offline_fallback["fields"]["CLIENT_REQUIREMENT_CHECK"] = evaluate_client_requirements(
+                                tmp_path, extracted_data=offline_fallback["fields"], form_type=form_type
+                            )
+                        except Exception as e:
+                            pass
+                        try:
+                            offline_fallback["fields"]["ESCALATION_CHECK"] = evaluate_escalation_check(
+                                tmp_path, extracted_data=offline_fallback["fields"]
+                            )
+                        except Exception as e:
+                            pass
                     return Response(offline_fallback)
                 return Response(
                     {"detail": data.get("message", "Extraction error")},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-            if custom_prompt and data.get("fields"):
-                return Response(data)
+            if isinstance(data, dict) and data.get("fields") and isinstance(data["fields"], dict):
+                try:
+                    data["fields"]["STATE_REQUIREMENT_CHECK"] = evaluate_state_requirements(
+                        tmp_path, extracted_data=data["fields"], form_type=form_type
+                    )
+                except Exception as e:
+                    pass
+                try:
+                    data["fields"]["CLIENT_REQUIREMENT_CHECK"] = evaluate_client_requirements(
+                        tmp_path, extracted_data=data["fields"], form_type=form_type
+                    )
+                except Exception as e:
+                    pass
+                try:
+                    data["fields"]["ESCALATION_CHECK"] = evaluate_escalation_check(
+                        tmp_path, extracted_data=data["fields"]
+                    )
+                except Exception as e:
+                    pass
 
             return Response(data)
 

@@ -3186,6 +3186,25 @@ function Subject({ defaultFormType }) {
       normalizedFields["mathematical_verification"] = result.mathematical_verification;
     }
 
+    const stateReqData = result.fields?.STATE_REQUIREMENT_CHECK || result.STATE_REQUIREMENT_CHECK;
+    if (stateReqData) {
+      setStateReqResponse(stateReqData);
+      normalizedFields["STATE_REQUIREMENT_CHECK"] = stateReqData;
+      normalizedFields["State Requirement Check"] = stateReqData;
+    }
+    const clientReqData = result.fields?.CLIENT_REQUIREMENT_CHECK || result.CLIENT_REQUIREMENT_CHECK;
+    if (clientReqData) {
+      setClientReqResponse(clientReqData);
+      normalizedFields["CLIENT_REQUIREMENT_CHECK"] = clientReqData;
+      normalizedFields["Client Requirement Check"] = clientReqData;
+    }
+    const escalationData = result.fields?.ESCALATION_CHECK || result.ESCALATION_CHECK;
+    if (escalationData) {
+      setEscalationResponse(escalationData);
+      normalizedFields["ESCALATION_CHECK"] = escalationData;
+      normalizedFields["Escalation Check"] = escalationData;
+    }
+
     setData(prevData => {
       const updatedData = { ...prevData, ...normalizedFields };
       Object.keys(normalizedFields).forEach(key => {
@@ -3215,24 +3234,6 @@ function Subject({ defaultFormType }) {
     setLastExtractionTime(totalSeconds.toFixed(1));
     setExtractionProgress(100);
   };
-
-  // if (result.fields?.INCOME_APPROACH?.['Estimated Monthly Market Rent $'] && selectedFormType !== '1007') {
-  //   setIsRentFormTypeMismatchDialogOpen(true);
-  // } else {
-  //   const sectionName = category ? `${category.replace(/_/g, ' ').toLowerCase()} section` : 'extraction';
-  //   let durationMessage = '';
-  //   if (minutes > 0) {
-  //     durationMessage += `${minutes}m `;
-  //   }
-  //   durationMessage += `${seconds}s`;
-  //   setNotification({
-  //     open: true,
-  //     message: <>Extraction of <strong style={{ color: '#000000' }}>{sectionName}</strong> completed in {durationMessage}.</>,
-  //     severity: 'success'
-  //   });
-  // }
-  // setLastExtractionTime(totalSeconds.toFixed(1));
-  // setExtractionProgress(100);
 
   const handleExtract = async (category, sectionId) => {
     setNotification({ open: false, message: '', severity: 'info' });
@@ -3398,7 +3399,13 @@ function Subject({ defaultFormType }) {
         throw new Error(result.detail || `HTTP error! status: ${res.status}`);
       }
       const responseData = result.fields || result;
-      setStateReqResponse(responseData);
+      const checkData = responseData.STATE_REQUIREMENT_CHECK || responseData;
+      setStateReqResponse(checkData);
+      setData(prevData => ({
+        ...prevData,
+        STATE_REQUIREMENT_CHECK: checkData,
+        'State Requirement Check': checkData
+      }));
     } catch (e) {
       const errorMsg = e.message || 'An unexpected error occurred.';
       setStateReqError(errorMsg);
@@ -3450,11 +3457,17 @@ function Subject({ defaultFormType }) {
         throw new Error(result.detail || `HTTP error! status: ${res.status}`);
       }
       const responseData = result.fields || result;
-      setUnpaidOkResponse(responseData);
+      const checkData = responseData.UNPAID_OK_CHECK || responseData;
+      setUnpaidOkResponse(checkData);
+      setData(prevData => ({
+        ...prevData,
+        UNPAID_OK_CHECK: checkData,
+        'Unpaid OK Check': checkData
+      }));
       setModalContent({
         title: 'Unpaid OK Lender Check',
         Component: UnpaidOkCheck,
-        props: { loading: false, response: responseData, error: '' }
+        props: { loading: false, response: checkData, error: '' }
       });
     } catch (e) {
       const errorMsg = e.message || 'An unexpected error occurred.';
@@ -3488,17 +3501,23 @@ function Subject({ defaultFormType }) {
     formData.append('category', 'CLIENT_REQUIREMENT_CHECK');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/extract/`, {
+      const res = await fetchWithRetry(`${API_BASE_URL}/api/extract/`, {
         method: 'POST',
         body: formData,
-      });
+      }, 3, 1000);
 
       const result = await res.json();
       if (!res.ok) {
         throw new Error(result.detail || `HTTP error! status: ${res.status}`);
       }
       const responseData = result.fields || result;
-      setClientReqResponse(responseData);
+      const checkData = responseData.CLIENT_REQUIREMENT_CHECK || responseData;
+      setClientReqResponse(checkData);
+      setData(prevData => ({
+        ...prevData,
+        CLIENT_REQUIREMENT_CHECK: checkData,
+        'Client Requirement Check': checkData
+      }));
     } catch (e) {
       const errorMsg = e.message || 'An unexpected error occurred.';
       setClientReqError(errorMsg);
@@ -3552,11 +3571,17 @@ function Subject({ defaultFormType }) {
         throw new Error(result.detail || `HTTP error! status: ${res.status}`);
       }
       const responseData = result.fields || result;
-      setFhaResponse(responseData);
+      const checkData = responseData.FHA_REQUIREMENT_CHECK || responseData;
+      setFhaResponse(checkData);
+      setData(prevData => ({
+        ...prevData,
+        FHA_REQUIREMENT_CHECK: checkData,
+        'FHA Requirement Check': checkData
+      }));
       setModalContent({
         title: 'FHA Requirement Check',
         Component: FhaCheck,
-        props: { loading: false, response: responseData, error: '' }
+        props: { loading: false, response: checkData, error: '' }
       });
     } catch (e) {
       const errorMsg = e.message || 'An unexpected error occurred.';
@@ -3616,11 +3641,17 @@ function Subject({ defaultFormType }) {
         throw new Error(result.detail || `HTTP error! status: ${res.status}`);
       }
       const responseData = result.fields || result;
-      setADUResponse(responseData);
+      const checkData = responseData.ADU_CHECK || responseData;
+      setADUResponse(checkData);
+      setData(prevData => ({
+        ...prevData,
+        ADU_CHECK: checkData,
+        'ADU Check': checkData
+      }));
       setModalContent({
         title: 'ADU File Check',
         Component: ADUCheck,
-        props: { loading: false, response: responseData, error: '' }
+        props: { loading: false, response: checkData, error: '' }
       });
     } catch (e) {
       const errorMsg = e.message || 'An unexpected error occurred.';
@@ -3650,19 +3681,26 @@ function Subject({ defaultFormType }) {
     formData.append('file', selectedFile);
     formData.append('form_type', selectedFormType);
     formData.append('comment', ESCALATION_CHECK_PROMPT);
+    formData.append('category', 'ESCALATION_CHECK');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/extract/`, {
+      const res = await fetchWithRetry(`${API_BASE_URL}/api/extract/`, {
         method: 'POST',
         body: formData,
-      });
+      }, 3, 1000);
 
       const result = await res.json();
       if (!res.ok) {
         throw new Error(result.detail || `HTTP error! status: ${res.status}`);
       }
       const responseData = result.fields || result;
-      setEscalationResponse(responseData);
+      const checkData = responseData.ESCALATION_CHECK || responseData;
+      setEscalationResponse(checkData);
+      setData(prevData => ({
+        ...prevData,
+        ESCALATION_CHECK: checkData,
+        'Escalation Check': checkData
+      }));
     } catch (e) {
       const errorMsg = e.message || 'An unexpected error occurred.';
       setEscalationError(errorMsg);
@@ -5490,29 +5528,6 @@ function Subject({ defaultFormType }) {
       on1007RevisionButtonClick: () => set1007RevisionLangDialogOpen(true),
       revisionHandlers,
     };
-
-    // const dialogSetters = {
-    //   setPropertyAddressRevisionLangDialogOpen,
-    //   setContractPriceRevisionLangDialogOpen,
-    //   setFinancialAssistanceRevisionLangDialogOpen,
-    //   setDateOfContractRevisionLangDialogOpen,
-    //   setNeighborhoodBoundariesRevisionLangDialogOpen,
-    //   setOtherLandUseRevisionLangDialogOpen,
-    //   setZoningComplianceRevisionLangDialogOpen,
-    //   setAreaRevisionLangDialogOpen,
-    //   setImprovementsRevisionLangDialogOpen,
-    //   setSalesGridRevisionLangDialogOpen,
-    //   setReconciliationRevisionLangDialogOpen,
-    //   setCostApproachRevisionLangDialogOpen,
-    //   setCertificationRevisionLangDialogOpen,
-    //   setOneWithAccessoryUnitRevisionLangDialogOpen,
-    //   setLenderClientAddressRevisionLangDialogOpen,
-    //   setLenderClientRevisionLangDialogOpen,
-    //   setHoaRevisionLangDialogOpen,
-    //   set1007RevisionLangDialogOpen,
-    //   setAddendumRevisionLangDialogOpen,
-    // };
-    // const revisionHandlers = createRevisionHandlers(data, setNotification, setNotes, dialogSetters);
 
     let formComponent;
     switch (selectedFormType) {

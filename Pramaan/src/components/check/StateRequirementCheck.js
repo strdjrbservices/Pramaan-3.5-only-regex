@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import {
+  Box,
   Button,
+  ButtonGroup,
   CircularProgress,
   Paper,
   Typography,
@@ -18,6 +20,10 @@ import {
   Select,
   MenuItem
 } from '@mui/material';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import CodeIcon from '@mui/icons-material/Code';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
 export const STATE_REQUIREMENTS_PROMPT = `
 Analyze the appraisal report for state-specific requirements based on the property's state.
@@ -55,6 +61,8 @@ State-Specific Requirements:
 
 const StateRequirementCheck = ({ onPromptSubmit, loading, response, error }) => {
   const [filterValue, setFilterValue] = useState('all');
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'json'
+  const [copied, setCopied] = useState(false);
 
   const handleCheckRequirements = () => {
     onPromptSubmit(STATE_REQUIREMENTS_PROMPT);
@@ -72,7 +80,13 @@ const StateRequirementCheck = ({ onPromptSubmit, loading, response, error }) => 
       }
     }
 
-    const { summary, details } = data;
+    if (data && !data.details) {
+      if (data.STATE_REQUIREMENT_CHECK) data = data.STATE_REQUIREMENT_CHECK;
+      else if (data.state_requirement_check) data = data.state_requirement_check;
+      else if (data['State Requirement Check']) data = data['State Requirement Check'];
+    }
+
+    const { summary, details } = data || {};
 
     const greenStatuses = ['fulfilled', 'ok', 'pass', 'passed', 'yes'];
     const isGreen = (status) => {
@@ -80,11 +94,71 @@ const StateRequirementCheck = ({ onPromptSubmit, loading, response, error }) => 
       return greenStatuses.includes(normalized);
     };
 
+    const isRedOrReview = (status) => {
+      const normalized = String(status || '').trim().toLowerCase();
+      return ['not fulfilled', 'failed', 'needs review', 'review', 'no'].includes(normalized);
+    };
+
+    const getStatusStyle = (status) => {
+      const normalizedStatus = String(status || '').trim().toLowerCase();
+      const greenList = ['fulfilled', 'ok', 'yes', 'pass', 'passed'];
+      const redList = ['not fulfilled', 'failed', 'no'];
+      const yellowList = ['needs review', 'review'];
+      const naList = ['not applicable', 'n/a', 'na'];
+
+      if (greenList.includes(normalizedStatus)) {
+        return {
+          backgroundColor: '#d4edda',
+          color: '#155724',
+          border: '1px solid #c3e6cb',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          display: 'inline-block'
+        };
+      } else if (redList.includes(normalizedStatus)) {
+        return {
+          backgroundColor: '#f8d7da',
+          color: '#721c24',
+          border: '1px solid #f5c6cb',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          display: 'inline-block'
+        };
+      } else if (yellowList.includes(normalizedStatus)) {
+        return {
+          backgroundColor: '#fff3cd',
+          color: '#856404',
+          border: '1px solid #ffeeba',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          display: 'inline-block'
+        };
+      } else if (naList.includes(normalizedStatus)) {
+        return {
+          backgroundColor: '#e9ecef',
+          color: '#495057',
+          border: '1px solid #ced4da',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          display: 'inline-block'
+        };
+      }
+      return {
+        padding: '4px 8px',
+        borderRadius: '4px',
+        display: 'inline-block'
+      };
+    };
+
     const parsedDetails = Array.isArray(details) ? details : [];
 
     const filteredDetails = parsedDetails.filter(item => {
       if (filterValue === 'passed') return isGreen(item.status);
-      if (filterValue === 'failed') return !isGreen(item.status);
+      if (filterValue === 'failed') return isRedOrReview(item.status);
       return true;
     });
 
@@ -97,110 +171,186 @@ const StateRequirementCheck = ({ onPromptSubmit, loading, response, error }) => 
     });
 
     return (
-      <Stack spacing={3} sx={{ mt: 3 }}>
-        {summary && (
-          <Paper elevation={1} sx={{ p: 2, bgcolor: 'background.default' }}>
-            <Typography variant="h6" gutterBottom component="div" color="primary.main">
-              Summary
+      <Stack spacing={2} sx={{ mt: 3 }}>
+        <Paper elevation={1} sx={{ p: 2 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1.5} sx={{ mb: 2 }}>
+            <Typography variant="h6" component="div" color="primary.main" display="flex" alignItems="center" gap={1}>
+              {viewMode === 'table' ? <TableChartIcon fontSize="small" /> : <CodeIcon fontSize="small" />}
+              {viewMode === 'table' ? 'State Requirements Breakdown' : 'State Requirements (Raw JSON)'}
             </Typography>
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-              {summary}
-            </Typography>
-          </Paper>
-        )}
 
-        {details && Array.isArray(details) && (
-          <Paper elevation={1} sx={{ p: 2 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-              <Typography variant="h6" component="div" color="primary.main">
-                Details
-              </Typography>
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel id="state-status-filter-label">Filter Status</InputLabel>
-                <Select
-                  labelId="state-status-filter-label"
-                  id="state-status-filter"
-                  value={filterValue}
-                  label="Filter Status"
-                  onChange={(e) => setFilterValue(e.target.value)}
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              {viewMode === 'table' && (
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <InputLabel id="state-status-filter-label">Filter Status</InputLabel>
+                  <Select
+                    labelId="state-status-filter-label"
+                    id="state-status-filter"
+                    value={filterValue}
+                    label="Filter Status"
+                    onChange={(e) => setFilterValue(e.target.value)}
+                  >
+                    <MenuItem value="all">All</MenuItem>
+                    <MenuItem value="passed">Passed / OK</MenuItem>
+                    <MenuItem value="failed">Failed / Review</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+
+              <ButtonGroup size="small" variant="outlined">
+                <Button
+                  variant={viewMode === 'table' ? 'contained' : 'outlined'}
+                  startIcon={<TableChartIcon fontSize="small" />}
+                  onClick={() => setViewMode('table')}
                 >
-                  <MenuItem value="all">All</MenuItem>
-                  <MenuItem value="passed">Passed / OK</MenuItem>
-                  <MenuItem value="failed">Failed / Review</MenuItem>
-                </Select>
-              </FormControl>
-            </Stack>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Requirement</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Value / Comment</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {sortedDetails.length > 0 ? (
-                    sortedDetails.map((item, index) => {
-                      const isInvalid = ['Not Applicable', 'Not Fulfilled'].includes(item.status);
-                      const statusStyle = isInvalid
-                        ? { backgroundColor: '#ff0000', color: '#ffffff', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', cursor: 'pointer' }
-                        : { backgroundColor: '#91ff00ff', color: '#000000', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' };
+                  Table View
+                </Button>
+                <Button
+                  variant={viewMode === 'json' ? 'contained' : 'outlined'}
+                  startIcon={<CodeIcon fontSize="small" />}
+                  onClick={() => setViewMode('json')}
+                >
+                  JSON View
+                </Button>
+              </ButtonGroup>
 
-                      let tooltipContent = '';
-                      if (isInvalid) {
-                        if (typeof item.value_or_comment === 'object' && item.value_or_comment !== null) {
-                          tooltipContent = item.value_or_comment.value || JSON.stringify(item.value_or_comment);
-                        } else {
-                          tooltipContent = item.value_or_comment;
-                        }
-                      }
-                      return (
-                        <TableRow key={index}>
-                          <TableCell>{item.requirement}</TableCell>
-                          <TableCell>
-                            {isInvalid ? (
-                              <Tooltip title={tooltipContent} arrow>
-                                <span style={statusStyle}>{item.status}</span>
-                              </Tooltip>
-                            ) : (
-                              <span style={statusStyle}>{item.status}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {typeof item.value_or_comment === 'object' && item.value_or_comment !== null ? (
-                              <>
-                                {item.value_or_comment.value && (
-                                  <Typography variant="body2">{item.value_or_comment.value}</Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<ContentCopyIcon fontSize="small" />}
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+              >
+                {copied ? 'Copied!' : 'Copy JSON'}
+              </Button>
+
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<FileDownloadIcon fontSize="small" />}
+                onClick={() => {
+                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'state_requirements.json';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Download JSON
+              </Button>
+            </Stack>
+          </Stack>
+
+          {viewMode === 'json' ? (
+            <Box
+              component="pre"
+              sx={{
+                m: 0,
+                p: 2.5,
+                borderRadius: 2,
+                backgroundColor: '#0d1117',
+                color: '#58a6ff',
+                fontFamily: 'Consolas, Monaco, monospace',
+                fontSize: '0.875rem',
+                lineHeight: 1.6,
+                maxHeight: '480px',
+                overflow: 'auto',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
+              }}
+            >
+              <code>{JSON.stringify(data, null, 2)}</code>
+            </Box>
+          ) : (
+            <>
+              {summary && (
+                <Paper elevation={0} sx={{ p: 2, mb: 2, bgcolor: 'background.default', borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
+                  <Typography variant="subtitle2" fontWeight={700} gutterBottom color="primary.main">
+                    Summary
+                  </Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {summary}
+                  </Typography>
+                </Paper>
+              )}
+
+              {details && Array.isArray(details) && (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Requirement</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Value / Comment</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {sortedDetails.length > 0 ? (
+                        sortedDetails.map((item, index) => {
+                          const normalizedStatus = String(item.status || '').trim().toLowerCase();
+                          const isInvalid = ['not fulfilled', 'failed', 'needs review', 'no'].includes(normalizedStatus);
+                          const statusStyle = getStatusStyle(item.status);
+
+                          let tooltipContent = '';
+                          if (isInvalid) {
+                            if (typeof item.value_or_comment === 'object' && item.value_or_comment !== null) {
+                              tooltipContent = item.value_or_comment.value || JSON.stringify(item.value_or_comment);
+                            } else {
+                              tooltipContent = item.value_or_comment;
+                            }
+                          }
+                          return (
+                            <TableRow key={index}>
+                              <TableCell>{item.requirement}</TableCell>
+                              <TableCell>
+                                {isInvalid ? (
+                                  <Tooltip title={tooltipContent} arrow>
+                                    <span style={statusStyle}>{item.status}</span>
+                                  </Tooltip>
+                                ) : (
+                                  <span style={statusStyle}>{item.status}</span>
                                 )}
-                                {item.value_or_comment.page_no && (
-                                  <Typography variant="caption" color="text.secondary">
-                                    Page: {item.value_or_comment.page_no}
-                                  </Typography>
+                              </TableCell>
+                              <TableCell>
+                                {typeof item.value_or_comment === 'object' && item.value_or_comment !== null ? (
+                                  <>
+                                    {item.value_or_comment.value && (
+                                      <Typography variant="body2">{item.value_or_comment.value}</Typography>
+                                    )}
+                                    {item.value_or_comment.page_no && (
+                                      <Typography variant="caption" color="text.secondary">
+                                        Page: {item.value_or_comment.page_no}
+                                      </Typography>
+                                    )}
+                                  </>
+                                ) : (
+                                  item.value_or_comment
                                 )}
-                              </>
-                            ) : (
-                              item.value_or_comment
-                            )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={3} align="center">
+                            No matching items found.
                           </TableCell>
                         </TableRow>
-                      )
-                    })
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={3} align="center">
-                        No matching items found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        )}
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </>
+          )}
+        </Paper>
       </Stack>
     );
-  }, [response, filterValue]);
+  }, [response, filterValue, viewMode, copied]);
 
   return (
     <div id="state-requirement-section" className="card shadow mb-4">

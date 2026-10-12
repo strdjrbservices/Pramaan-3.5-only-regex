@@ -1,3 +1,4 @@
+/* eslint-disable testing-library/no-container, testing-library/no-node-access */
 import React from 'react';
 import { render } from '@testing-library/react';
 import { EditableField } from '../components/FormComponents';
