@@ -3385,6 +3385,7 @@ function Subject({ defaultFormType }) {
     formData.append('file', selectedFile);
     formData.append('form_type', selectedFormType);
     formData.append('comment', STATE_REQUIREMENTS_PROMPT);
+    formData.append('category', 'STATE_REQUIREMENT_CHECK');
 
     try {
       const res = await fetchWithRetry(`${API_BASE_URL}/api/extract/`, {
@@ -3484,6 +3485,7 @@ function Subject({ defaultFormType }) {
     formData.append('file', selectedFile);
     formData.append('form_type', selectedFormType);
     formData.append('comment', CLIENT_REQUIREMENT_PROMPT);
+    formData.append('category', 'CLIENT_REQUIREMENT_CHECK');
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/extract/`, {

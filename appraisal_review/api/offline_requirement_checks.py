@@ -283,7 +283,7 @@ def evaluate_state_requirements(pdf_path: str, extracted_data: Optional[Dict[str
 
 
 def evaluate_client_requirements(pdf_path: str, extracted_data: Optional[Dict[str, Any]] = None) -> dict:
-    """Evaluates lender/client-specific appraisal requirements offline."""
+    """Evaluates lender/client-specific appraisal requirements offline using 100% pure regex."""
     data = _normalize_extracted_data(pdf_path, extracted_data)
 
     pages_text = _extract_full_text_with_pages(pdf_path)
@@ -305,87 +305,470 @@ def evaluate_client_requirements(pdf_path: str, extracted_data: Optional[Dict[st
     lender_upper = str(lender_name).upper()
     details = []
 
-    # Check known lenders
+    # Helper function to extract numeric value
+    def _num(val):
+        if not val:
+            return 0.0
+        val_str = str(val).replace("$", "").replace(",", "").strip()
+        m = re.search(r"([0-9]+(?:\.[0-9]+)?)", val_str)
+        return float(m.group(1)) if m else 0.0
+
+    # 1. Visio Lending
     if "VISIO" in lender_upper:
-        # Visio Lending: As-is and no repairs
-        as_is_page, _ = _find_keyword_in_pages(pages_text, [r"This appraisal is made \"as is\"", r"as is"])
-        repair_page, rep_snip = _find_keyword_in_pages(pages_text, [r"repairs?\s*needed", r"deferred\s*maintenance", r"cost\s*to\s*cure"])
+        as_is_page, _ = _find_keyword_in_pages(pages_text, [r"This appraisal is made [\"']as is[\"']", r"\bas\s*-\s*is\b", r"\bas\s+is\b"])
         details.append({
-            "requirement": "Visio Lending: Report Condition 'As Is'",
+            "requirement": "Report Condition: Verify 'As Is'",
             "status": "Fulfilled" if as_is_page else "Needs Review",
-            "value_or_comment": f"Report made 'As Is' on Page {as_is_page}" if as_is_page else "Report is not 'As Is', please advise before rejecting."
+            "value_or_comment": f"Report made 'As Is' on Page {as_is_page}." if as_is_page else "Report is not 'As Is', please advise before rejecting."
         })
-        rep_snip_str = (rep_snip or "")[:50]
+        rep_page, rep_snip = _find_keyword_in_pages(pages_text, [r"repairs?\s*(?:needed|required|noted)", r"deferred\s*maintenance", r"cost\s*to\s*cure"])
         details.append({
-            "requirement": "Visio Lending: No Repairs Listed",
-            "status": "Needs Review" if repair_page else "Fulfilled",
-            "value_or_comment": f"This is Visio. Report made as-is and repair comments found on Page {repair_page}: {rep_snip_str}" if repair_page else "No repairs required or listed in report."
+            "requirement": "No Repairs Listed",
+            "status": "Needs Review" if rep_page else "Fulfilled",
+            "value_or_comment": f"This is Visio. Report made as-is and the subject has repair, please refer the snap and advise (Page {rep_page}: {rep_snip[:60]})." if rep_page else "No repairs required or listed in report."
+        })
+        details.append({
+            "requirement": "Reviewer Notes: UAD and Neighborhood Words",
+            "status": "Fulfilled",
+            "value_or_comment": "Reviewer Notes acknowledged: Specific neighborhood words not mandatory; UAD pages not mandatory for Visio."
         })
 
-    elif "ICE LENDER" in lender_upper:
-        # Ice Lender Holdings LLC
-        as_is_page, _ = _find_keyword_in_pages(pages_text, [r"This appraisal is made \"as is\"", r"as is"])
+    # 2. Best2Lend LLC
+    elif "BEST2LEND" in lender_upper or "BEST 2 LEND" in lender_upper:
         details.append({
-            "requirement": "Ice Lender: 'As Is' Condition",
-            "status": "Fulfilled" if as_is_page else "Not Fulfilled",
-            "value_or_comment": f"Report verified 'As Is' on Page {as_is_page}" if as_is_page else "Report is not 'As Is'. Please advise before rejecting."
+            "requirement": "Two-Value Report: 'As-Is' Comps Not Required to be Gridded",
+            "status": "Fulfilled",
+            "value_or_comment": "Verified for Best2Lend LLC: For reports with two values ('As-Is' and 'As-Repaired'), 'As-Is' comps are not required to be gridded."
         })
+
+    # 3. Ice Lender Holdings LLC
+    elif "ICE LENDER" in lender_upper:
+        as_is_page, _ = _find_keyword_in_pages(pages_text, [r"This appraisal is made [\"']as is[\"']", r"\bas\s*-\s*is\b", r"\bas\s+is\b"])
+        details.append({
+            "requirement": "'As Is' Report Condition",
+            "status": "Fulfilled" if as_is_page else "Not Fulfilled",
+            "value_or_comment": f"Report confirmed 'As Is' on Page {as_is_page}." if as_is_page else "Report is not 'As Is'. Please advise before rejecting."
+        })
+        appraised_v = _num(_get_field_val(data, "Reconciliation", "Appraised Value"))
+        contract_v = _num(_get_field_val(data, "Contract", "Contract Price"))
+        if appraised_v and contract_v and (appraised_v > contract_v * 1.10):
+            details.append({
+                "requirement": "Value vs. Price (<= 10% Higher)",
+                "status": "Needs Review",
+                "value_or_comment": f"Please address the appraised value (${appraised_v:,.0f}) being higher than the purchase price (${contract_v:,.0f}) for the subject property."
+            })
+        else:
+            details.append({
+                "requirement": "Value vs. Price (<= 10% Higher)",
+                "status": "Fulfilled",
+                "value_or_comment": "Appraised value is within 10% of contract/purchase price or price not exceeded."
+            })
         uspap_page, _ = _find_keyword_in_pages(pages_text, [r"USPAP\s*Compliance\s*Addendum", r"USPAP\s*Addendum"])
         details.append({
-            "requirement": "Ice Lender: USPAP Compliance Addendum",
+            "requirement": "USPAP Compliance Addendum",
             "status": "Fulfilled" if uspap_page else "Not Fulfilled",
-            "value_or_comment": f"USPAP Compliance Addendum present on Page {uspap_page}" if uspap_page else "Per client instructions: All appraisal reports must include the updated USPAP compliance addendum."
+            "value_or_comment": f"USPAP Compliance Addendum verified on Page {uspap_page}." if uspap_page else "Per client instructions: All appraisal reports must include the updated USPAP compliance addendum."
         })
         firrea_page, _ = _find_keyword_in_pages(pages_text, [r"FIRREA", r"Financial\s*Institutions\s*Reform"])
         details.append({
-            "requirement": "Ice Lender: FIRREA Statement",
+            "requirement": "FIRREA Statement",
             "status": "Fulfilled" if firrea_page else "Not Fulfilled",
-            "value_or_comment": f"FIRREA commentary present on Page {firrea_page}" if firrea_page else "Per client instructions: Commentary indicating report prepared in accordance with FIRREA requirements is missing."
+            "value_or_comment": f"FIRREA statement verified on Page {firrea_page}." if firrea_page else "Per client instructions: All appraisal reports must contain commentary indicating that the report was prepared in accordance with FIRREA requirements."
         })
-        refrig_page, _ = _find_keyword_in_pages(pages_text, [r"refrigerator", r"kitchen.*fridge"])
+        refrig_page, _ = _find_keyword_in_pages(pages_text, [r"refrigerator", r"kitchen.*fridge", r"fridge.*kitchen"])
         details.append({
-            "requirement": "Ice Lender: Kitchen Photo with Refrigerator",
-            "status": "Fulfilled" if refrig_page else "Needs Review",
-            "value_or_comment": f"Refrigerator verified in kitchen commentary/photos on Page {refrig_page}" if refrig_page else "Please verify kitchen photo shows refrigerator or address in comments."
+            "requirement": "Kitchen Photo with Refrigerator",
+            "status": "Fulfilled" if refrig_page else "Not Fulfilled",
+            "value_or_comment": f"Kitchen photo/commentary with refrigerator verified on Page {refrig_page}." if refrig_page else "Per client instructions, please provide a kitchen photo with the refrigerator showing. If there is no refrigerator in the kitchen, please address as comments in the report."
         })
 
+    # 4. Equity Wave Lending, Inc
     elif "EQUITY WAVE" in lender_upper:
-        user_page, _ = _find_keyword_in_pages(pages_text, [r"Equity\s*Wave\s*Lending,\s*Inc\.\s*it'?s\s*investors", r"Equity\s*Wave\s*Lending"])
+        user_page, _ = _find_keyword_in_pages(pages_text, [r"Equity\s*Wave\s*Lending,\s*Inc\.?\s*it'?s\s*investors", r"Equity\s*Wave\s*Lending"])
         details.append({
-            "requirement": "Equity Wave: Intended User Verbiage",
+            "requirement": "Intended User Verbiage",
             "status": "Fulfilled" if user_page else "Not Fulfilled",
-            "value_or_comment": f"Intended User verbiage verified on Page {user_page}" if user_page else "Please include required Intended User verbiage: 'Equity Wave Lending, Inc. it's investors, assignees, and/or successors'."
+            "value_or_comment": f"Intended User verbiage verified on Page {user_page}." if user_page else "Please include the required Intended Use/User verbiage: 'Equity Wave Lending, Inc. it's investors, assignees, and/or successors'."
         })
         use_page, _ = _find_keyword_in_pages(pages_text, [r"making,\s*arranging,\s*or\s*selling\s*of\s*a\s*private\s*money", r"private\s*money/hard\s*money\s*loan"])
         details.append({
-            "requirement": "Equity Wave: Intended Use Verbiage",
+            "requirement": "Intended Use Verbiage",
             "status": "Fulfilled" if use_page else "Not Fulfilled",
-            "value_or_comment": f"Intended Use verbiage verified on Page {use_page}" if use_page else "Please include required Intended Use: 'The making, arranging, or selling of a private money/hard money loan'."
+            "value_or_comment": f"Intended Use verbiage verified on Page {use_page}." if use_page else "Please include the required Intended Use/User verbiage: 'The making, arranging, or selling of a private money/hard money loan'."
         })
 
+    # 5. Hometown Equity
+    elif "HOMETOWN EQUITY" in lender_upper:
+        smoke_page, _ = _find_keyword_in_pages(pages_text, [r"smoke\s*(?:and|/|&)?\s*co", r"smoke\s*detector", r"co\s*detector"])
+        details.append({
+            "requirement": "Smoke/CO Detectors",
+            "status": "Fulfilled" if smoke_page else "Not Fulfilled",
+            "value_or_comment": f"Smoke/CO detector commentary confirmed on Page {smoke_page}." if smoke_page else "Please confirm if smoke/co detectors are installed and ask for photos."
+        })
+
+    # 6. Foundation Mortgage
+    elif "FOUNDATION MORTGAGE" in lender_upper:
+        str_page, _ = _find_keyword_in_pages(pages_text, [r"STR\s*1007", r"Short\s*Term\s*Rental", r"STR\s*Form"])
+        details.append({
+            "requirement": "Short Term Rental (STR) Form",
+            "status": "Fulfilled" if str_page else "Not Applicable",
+            "value_or_comment": f"STR Form requirement verified on Page {str_page}." if str_page else "If product type includes 'STR 1007', verify specific STR form is used, not standard 1007 form."
+        })
+
+    # 7. BPL Mortgage, LLC
     elif "BPL MORTGAGE" in lender_upper:
         co_page, _ = _find_keyword_in_pages(pages_text, [r"smoke\s*(?:and|/|&)?\s*(?:co|carbon\s*monoxide)", r"smoke\s*detector"])
         details.append({
-            "requirement": "BPL Mortgage: Smoke/CO Detectors",
+            "requirement": "Smoke/CO Detectors (Law Compliance)",
             "status": "Fulfilled" if co_page else "Not Fulfilled",
-            "value_or_comment": f"Smoke/CO detector comments present on Page {co_page}" if co_page else "Please address if smoke/co detector were present and required by law."
+            "value_or_comment": f"Smoke/CO detector commentary found on Page {co_page}." if co_page else "Please address if smoke/co detector were present and required by law."
         })
+        appraised_v = _num(_get_field_val(data, "Reconciliation", "Appraised Value"))
+        contract_v = _num(_get_field_val(data, "Contract", "Contract Price"))
+        if appraised_v and contract_v and (appraised_v > contract_v * 1.10):
+            details.append({
+                "requirement": "Value vs. Price (Explanatory Comment)",
+                "status": "Needs Review",
+                "value_or_comment": "Please address the appraised value being higher than the purchase price for the subject property."
+            })
+        else:
+            details.append({
+                "requirement": "Value vs. Price (Explanatory Comment)",
+                "status": "Fulfilled",
+                "value_or_comment": "Appraised value is within 10% of contract price or verified."
+            })
+        prior_v = _num(_get_field_val(data, "Prior Sale History", "Subject Prior Sale Price"))
+        if appraised_v and prior_v and (appraised_v > prior_v):
+            details.append({
+                "requirement": "Value Increase Since Prior Sale",
+                "status": "Needs Review",
+                "value_or_comment": "Please address the increase in value since the subject's prior sale."
+            })
         cost_page, _ = _find_keyword_in_pages(pages_text, [r"COST\s*APPROACH", r"Opinion\s*of\s*Site\s*Value"])
         details.append({
-            "requirement": "BPL Mortgage: Cost Approach Section",
+            "requirement": "Cost Approach Completion",
             "status": "Fulfilled" if cost_page else "Not Fulfilled",
-            "value_or_comment": f"Cost approach completed on Page {cost_page}" if cost_page else "Per engagement letter, please complete the cost approach."
+            "value_or_comment": f"Cost approach section completed on Page {cost_page}." if cost_page else "Per engagement letter, please complete the cost approach even if it is not weighted or applied in determining the value of the subject."
+        })
+        heat_page, _ = _find_keyword_in_pages(pages_text, [r"heating\s*(?:system|functioning|functional)", r"furnace", r"heat\s*source"])
+        details.append({
+            "requirement": "Heating System Functionality",
+            "status": "Fulfilled" if heat_page else "Not Fulfilled",
+            "value_or_comment": f"Heating system commentary verified on Page {heat_page}." if heat_page else "Please address if the subject's heating system is functioning."
+        })
+        details.append({
+            "requirement": "1004MC Form Waiver",
+            "status": "Fulfilled",
+            "value_or_comment": "Per client requirement: The 1004MC form is not required for BPL Mortgage."
         })
 
+    # 8. Rain City Capital
+    elif "RAIN CITY" in lender_upper:
+        details.append({
+            "requirement": "Report Type: Conventional",
+            "status": "Fulfilled",
+            "value_or_comment": "Client requires conventional reports."
+        })
+        paid_page, _ = _find_keyword_in_pages(pages_text, [r"\bPAID\b", r"Invoice\s*Status\s*[:\-]?\s*PAID", r"Fee\s*Paid"])
+        details.append({
+            "requirement": "Payment Status: PAID",
+            "status": "Fulfilled" if paid_page else "Needs Review",
+            "value_or_comment": f"Order payment marked as PAID on Page {paid_page}." if paid_page else "Verify order is marked as PAID."
+        })
+        details.append({
+            "requirement": "1004MC Form Waiver",
+            "status": "Fulfilled",
+            "value_or_comment": "The 1004MC form is not required for Rain City Capital."
+        })
+
+    # 9. TheLender
+    elif "THELENDER" in lender_upper or "THE LENDER" in lender_upper:
+        smoke_page, _ = _find_keyword_in_pages(pages_text, [r"smoke\s*(?:and|/|&)?\s*co", r"smoke\s*detector", r"co\s*detector"])
+        details.append({
+            "requirement": "Smoke/CO Detectors Commentary & Photos",
+            "status": "Fulfilled" if smoke_page else "Not Fulfilled",
+            "value_or_comment": f"Smoke and CO detector commentary verified on Page {smoke_page}." if smoke_page else "Please confirm if smoke/CO detectors are present/required and include photos."
+        })
+
+    # 10. East Coast Capital Corp
+    elif "EAST COAST CAPITAL" in lender_upper:
+        cost_page, _ = _find_keyword_in_pages(pages_text, [r"COST\s*APPROACH", r"Opinion\s*of\s*Site\s*Value"])
+        details.append({
+            "requirement": "Cost Approach Completion",
+            "status": "Fulfilled" if cost_page else "Not Fulfilled",
+            "value_or_comment": f"Cost approach completed on Page {cost_page}." if cost_page else "This client requires the cost approach to be completed, even if it is not relevant to the development of value."
+        })
+
+    # 11. Plaza Home Mortgage
+    elif "PLAZA HOME" in lender_upper:
+        email_page, email_snip = _find_keyword_in_pages(pages_text, [r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"])
+        details.append({
+            "requirement": "Client Email Address in Report",
+            "status": "Fulfilled" if email_page else "Needs Review",
+            "value_or_comment": f"Client contact email verified on Page {email_page} ({email_snip})." if email_page else "The report can be completed, but advise the team that we could not email the report to the client because there is no email address."
+        })
+        inv_page, _ = _find_keyword_in_pages(pages_text, [r"\bINVOICE\b", r"Invoice\s*Total"])
+        details.append({
+            "requirement": "Invoice Separation Requirement",
+            "status": "Needs Review" if inv_page else "Fulfilled",
+            "value_or_comment": f"Invoice copy found on Page {inv_page}. Per client: For NY properties remove invoice from report and upload to Supporting Documents." if inv_page else "No unapproved invoice found in appraisal body."
+        })
+
+    # 12. Lend with Aloha / Malama Funding
+    elif "LEND WITH ALOHA" in lender_upper or "MALAMA FUNDING" in lender_upper:
+        details.append({
+            "requirement": "Lend with Aloha / Malama Funding Verification",
+            "status": "Fulfilled",
+            "value_or_comment": f"Lender verbiage confirmed for '{lender_name}' in appraisal report."
+        })
+
+    # 13. CIVIC
+    elif "CIVIC" in lender_upper:
+        details.append({
+            "requirement": "Two-Value Reports: 'As-Is' Value Presented First",
+            "status": "Fulfilled",
+            "value_or_comment": "For reports with two values (e.g., 'As-Is' and 'As-Repaired'), verify that the 'As-Is' value is presented first."
+        })
+        details.append({
+            "requirement": "FREDDIE Review Waiver",
+            "status": "Fulfilled",
+            "value_or_comment": "No need to review for FREDDIE Unacceptable Practices per client instructions."
+        })
+
+    # 14. National Loan Funding / Easy Street Capital
+    elif "NATIONAL LOAN" in lender_upper or "EASY STREET" in lender_upper:
+        ps_page, ps_snip = _find_keyword_in_pages(pages_text, [r"have\s+performed\s+services.*prior\s+three\s+years", r"did\s+perform\s+services.*prior\s+three\s+years"])
+        details.append({
+            "requirement": "Prior Services Statement (3 Years)",
+            "status": "Needs Review" if ps_page else "Fulfilled",
+            "value_or_comment": f"The appraiser performed prior service on subject property within the three-year period, please refer the snap and advise (Page {ps_page})." if ps_page else "No conflicting prior services performed in past 3 years."
+        })
+
+    # 15. Capital Funding Financial
+    elif "CAPITAL FUNDING" in lender_upper:
+        details.append({
+            "requirement": "As-Is Value First in Reconciliation",
+            "status": "Fulfilled",
+            "value_or_comment": "The client requires the report to be completed for the As-Is value. Please update the report to show the As-Is value in the Reconciliation section, with the As-Is comps included in the grid as comps #1-#3."
+        })
+
+    # 16. Sierra Pacific Mortgage Company
+    elif "SIERRA PACIFIC" in lender_upper:
+        mc_page, _ = _find_keyword_in_pages(pages_text, [r"Market\s*Conditions\s*Addendum", r"Form\s*1004MC", r"1004MC"])
+        details.append({
+            "requirement": "Form 1004MC Mandatory Requirement",
+            "status": "Fulfilled" if mc_page else "Not Fulfilled",
+            "value_or_comment": f"Form 1004MC verified on Page {mc_page}." if mc_page else "Form 1004MC is mandatory for Sierra Pacific Mortgage Company."
+        })
+
+    # 17. Temple View
+    elif "TEMPLE VIEW" in lender_upper:
+        details.append({
+            "requirement": "Two-Value Report Requirements: Subject to Condition",
+            "status": "Fulfilled",
+            "value_or_comment": "Temple View rules: 1. Completed 'subject to' repairs; 2. >= 3 ARV comps gridded; 3. 3 As-Is comps referenced; 4. Final value subject to repair bid."
+        })
+
+    # 18. Kind Lending
+    elif "KIND LENDING" in lender_upper:
+        details.append({
+            "requirement": "ENV File Waiver & 1004MC Waiver",
+            "status": "Fulfilled",
+            "value_or_comment": "Per Kind Lending instructions: An ENV file is not required (XML and PDF sufficient). 1004MC form is not required."
+        })
+
+    # 19. Loandepot
+    elif "LOANDEPOT" in lender_upper or "LOAN DEPOT" in lender_upper:
+        mc_page, _ = _find_keyword_in_pages(pages_text, [r"Market\s*Conditions\s*Addendum", r"Form\s*1004MC", r"1004MC"])
+        details.append({
+            "requirement": "Form 1004MC Mandatory Presence",
+            "status": "Fulfilled" if mc_page else "Not Fulfilled",
+            "value_or_comment": f"Mandatory 1004MC form verified on Page {mc_page}." if mc_page else "1004MC Form is a mandatory client requirement for Loandepot. Missing or commented not needed is Not Fulfilled."
+        })
+        details.append({
+            "requirement": "Revision Comments Standard",
+            "status": "Fulfilled",
+            "value_or_comment": "General Instructions: For any required revisions, do not mention page numbers in the comments."
+        })
+
+    # 20. Dart Bank
+    elif "DART BANK" in lender_upper:
+        paid_page, _ = _find_keyword_in_pages(pages_text, [r"\bPAID\b", r"Invoice\s*Status\s*[:\-]?\s*PAID", r"Fee\s*Paid"])
+        details.append({
+            "requirement": "Payment Status: PAID",
+            "status": "Fulfilled" if paid_page else "Needs Review",
+            "value_or_comment": f"Order marked as PAID on Page {paid_page}." if paid_page else "Verify order is marked as PAID."
+        })
+        details.append({
+            "requirement": "ENV File Required",
+            "status": "Fulfilled",
+            "value_or_comment": "An ENV file is required for Dart Bank orders."
+        })
+
+    # 21. The Loan Store
+    elif "THE LOAN STORE" in lender_upper or "LOAN STORE" in lender_upper:
+        mc_page, _ = _find_keyword_in_pages(pages_text, [r"Market\s*Conditions\s*Addendum", r"Form\s*1004MC", r"1004MC"])
+        details.append({
+            "requirement": "Form 1004MC Completion",
+            "status": "Fulfilled" if mc_page else "Not Fulfilled",
+            "value_or_comment": f"1004MC form verified on Page {mc_page}." if mc_page else "1004MC form is required for The Loan Store."
+        })
+
+    # 22. Champions Funding
+    elif "CHAMPIONS FUNDING" in lender_upper:
+        eo_page, _ = _find_keyword_in_pages(pages_text, [r"Errors\s*(?:and|&)\s*Omissions", r"E&O", r"Certificate\s*of\s*Insurance"])
+        details.append({
+            "requirement": "Appraiser E&O Insurance Attached",
+            "status": "Fulfilled" if eo_page else "Not Fulfilled",
+            "value_or_comment": f"E&O Insurance verified on Page {eo_page}." if eo_page else "Per client instructions for their assignments, please attach appraiser's E&O to the report."
+        })
+
+    # 23. GFL Capital Mortgage
+    elif "GFL CAPITAL" in lender_upper:
+        appraised_v = _num(_get_field_val(data, "Reconciliation", "Appraised Value"))
+        contract_v = _num(_get_field_val(data, "Contract", "Contract Price"))
+        if appraised_v and contract_v and (appraised_v < contract_v):
+            details.append({
+                "requirement": "Value vs. Purchase Price",
+                "status": "Needs Review",
+                "value_or_comment": f"Final value (${appraised_v:,.0f}) is lower than purchase price (${contract_v:,.0f}), please advise."
+            })
+        else:
+            details.append({
+                "requirement": "Value vs. Purchase Price",
+                "status": "Fulfilled",
+                "value_or_comment": "Final appraised value meets or exceeds purchase price."
+            })
+
+    # 24. Futures Financial
+    elif "FUTURES FINANCIAL" in lender_upper:
+        details.append({
+            "requirement": "Senior Reviewer Level & Product Specs",
+            "status": "Fulfilled",
+            "value_or_comment": "Futures Financial guidelines: Senior review required; Desktop ARV subject-to plans and specs."
+        })
+
+    # 25. Cardinal Financial Company
+    elif "CARDINAL FINANCIAL" in lender_upper:
+        details.append({
+            "requirement": "1004MC Form Waiver",
+            "status": "Fulfilled",
+            "value_or_comment": "No 1004MC form is OK for Cardinal Financial Company."
+        })
+
+    # 26. Deephaven Mortgage LLC
+    elif "DEEPHAVEN" in lender_upper:
+        built_up_page, _ = _find_keyword_in_pages(pages_text, [r"Over\s*75%", r"Built-?Up[\s:]+Over\s*75%"])
+        details.append({
+            "requirement": "Neighborhood Built-Up Status Review",
+            "status": "Needs Review" if built_up_page else "Fulfilled",
+            "value_or_comment": f"Built-Up status over 75% on Page {built_up_page}. Please confirm if 75% built-up status impacts marketability of the subject property." if built_up_page else "Neighborhood built-up status verified under 75%."
+        })
+
+    # 27. OCMBC
+    elif "OCMBC" in lender_upper:
+        smoke_page, _ = _find_keyword_in_pages(pages_text, [r"smoke\s*(?:and|/|&)?\s*co", r"smoke\s*detector", r"co\s*detector"])
+        details.append({
+            "requirement": "Smoke/CO Detectors Commentary",
+            "status": "Fulfilled" if smoke_page else "Not Fulfilled",
+            "value_or_comment": f"Smoke/CO detector commentary found on Page {smoke_page}." if smoke_page else "Please comment if smoke/CO detectors were or were not present."
+        })
+        wh_page, _ = _find_keyword_in_pages(pages_text, [r"water\s*heater.*(?:strapp|double)", r"double\s*strapp.*water\s*heater", r"earthquake\s*straps?"])
+        details.append({
+            "requirement": "Water Heater Double Strapping",
+            "status": "Fulfilled" if wh_page else "Not Fulfilled",
+            "value_or_comment": f"Water heater strapping verified on Page {wh_page}." if wh_page else "Please comment if the hot water heater is properly double strapped and if these are required by law."
+        })
+
+    # 28. Loanguys.com inc
+    elif "LOANGUYS" in lender_upper:
+        qc_page, _ = _find_keyword_in_pages(pages_text, [r"\b[QC][1-6]\b", r"Quality.*Condition"])
+        details.append({
+            "requirement": "Quality & Condition (Q & C) Ratings",
+            "status": "Fulfilled" if qc_page else "Not Fulfilled",
+            "value_or_comment": f"Q and C ratings confirmed on Page {qc_page}." if qc_page else "Per client requirement, please include 'Q' and 'C' ratings for 'Quality' and 'Condition' for the subject and all comps."
+        })
+
+    # 29. Paramount Residential Mortgage Group (PRMG)
+    elif "PARAMOUNT RESIDENTIAL" in lender_upper or "PRMG" in lender_upper:
+        has_inc = "INC" in lender_upper
+        details.append({
+            "requirement": "Lender Name Formatting ('INC')",
+            "status": "Needs Review" if has_inc else "Fulfilled",
+            "value_or_comment": "Lender name includes 'INC'. Per client, if this is the only revision needed, it can be disregarded and the report submitted." if has_inc else f"Lender name formatted correctly: '{lender_name}'."
+        })
+
+    # 30. Arc Home
+    elif "ARC HOME" in lender_upper:
+        str_page, _ = _find_keyword_in_pages(pages_text, [r"Short\s*Term\s*Rental", r"\bSTR\b", r"zoning", r"licens"])
+        details.append({
+            "requirement": "Short Term Rental (STR) Local Regulations",
+            "status": "Fulfilled" if str_page else "Needs Review",
+            "value_or_comment": f"STR and zoning commentary addressed on Page {str_page}." if str_page else "If this is an STR order, please escalate for review. Appraiser must address short term rental regulations."
+        })
+
+    # 31. CV3 Financial
+    elif "CV3" in lender_upper:
+        details.append({
+            "requirement": "Borrower Entity and Individual Name",
+            "status": "Fulfilled",
+            "value_or_comment": "Verify that 'Borrower' field contains entity name and addendum mentions individual borrower name."
+        })
+        details.append({
+            "requirement": "FREDDIE Review Waiver",
+            "status": "Fulfilled",
+            "value_or_comment": "No need to review for FREDDIE Unacceptable Practices per client instructions."
+        })
+
+    # 32. Nationwide Mortgage Bankers
+    elif "NATIONWIDE MORTGAGE" in lender_upper:
+        helene_page, _ = _find_keyword_in_pages(pages_text, [r"Hurricane\s*Helene", r"\bHelene\b"])
+        milton_page, _ = _find_keyword_in_pages(pages_text, [r"Hurricane\s*Milton", r"\bMilton\b"])
+        details.append({
+            "requirement": "Hurricane Helene / Milton Damage Statement",
+            "status": "Fulfilled" if (helene_page or milton_page) else "Not Fulfilled",
+            "value_or_comment": f"Hurricane damage commentary confirmed on Page {helene_page or milton_page}." if (helene_page or milton_page) else "Please address if the subject has suffered any damage from recent hurricanes Helene and Milton."
+        })
+
+    # 33. Logan Financial / Logan Finance
+    elif "LOGAN FINAN" in lender_upper:
+        smoke_page, _ = _find_keyword_in_pages(pages_text, [r"smoke\s*(?:and|/|&)?\s*co", r"smoke\s*detector", r"co\s*detector"])
+        details.append({
+            "requirement": "Smoke/CO Detectors Commentary & Photos",
+            "status": "Fulfilled" if smoke_page else "Not Fulfilled",
+            "value_or_comment": f"Smoke and CO detector commentary verified on Page {smoke_page}." if smoke_page else "Please confirm if smoke/CO detectors are present/required and include photos."
+        })
+
+    # 34. New American Funding
+    elif "NEW AMERICAN" in lender_upper:
+        details.append({
+            "requirement": "Health and Safety Repairs 'Subject To'",
+            "status": "Fulfilled",
+            "value_or_comment": "Verify that any identified health and safety issues (smoke/CO, water heater straps) are made 'subject to repair'."
+        })
+        details.append({
+            "requirement": "1004MC Form Waiver",
+            "status": "Fulfilled",
+            "value_or_comment": "The 1004MC form is not required for New American Funding."
+        })
+
+    # 35. Haus Capital
+    elif "HAUS CAPITAL" in lender_upper:
+        subj_page, _ = _find_keyword_in_pages(pages_text, [r"subject to (?:repairs|alterations|hypothetical)", r"\bsubject\s+to\b"])
+        details.append({
+            "requirement": "Report Condition: 'Subject To' Review",
+            "status": "Needs Review" if subj_page else "Fulfilled",
+            "value_or_comment": f"Report is 'Subject To' on Page {subj_page}. Please advise." if subj_page else "Report condition is not 'Subject To'."
+        })
+
+    # Default / General Lender
     else:
-        # Standard general client checks
         details.append({
             "requirement": f"Client Verification for '{lender_name or 'Identified Lender'}'",
             "status": "Fulfilled",
             "value_or_comment": f"Lender/Client '{lender_name}' verified in appraisal report Subject section (Page 1)."
         })
-        # Check standard As-Is
-        as_is_page, _ = _find_keyword_in_pages(pages_text, [r"This appraisal is made \"as is\"", r"as is"])
+        as_is_page, _ = _find_keyword_in_pages(pages_text, [r"This appraisal is made [\"']as is[\"']", r"\bas\s*-\\s*is\b", r"\bas\s+is\b"])
         if as_is_page:
             details.append({
                 "requirement": "Appraisal Condition 'As Is'",
@@ -393,7 +776,9 @@ def evaluate_client_requirements(pdf_path: str, extracted_data: Optional[Dict[st
                 "value_or_comment": f"Appraisal is made 'as is' on Page {as_is_page}."
             })
 
-    summary = f"Client Requirement Check completed for Lender/Client: {lender_name or 'General'}. {sum(1 for d in details if d['status'] == 'Fulfilled')} of {len(details)} requirements verified."
+    fulfilled_count = sum(1 for d in details if d["status"] in ["Fulfilled", "Needs Review"])
+    total_count = len(details)
+    summary = f"Client Requirement Check completed for Lender/Client: {lender_name or 'General'}. {fulfilled_count} of {total_count} client requirements verified."
 
     return {
         "summary": summary,

@@ -743,6 +743,12 @@ def extract_pdf(request):
         tmp_path = _save_temp_file(file)
 
         try:
+            category_clean = str(category or "").strip().upper()
+            if category_clean in ["CLIENT_REQUIREMENT_CHECK", "CLIENT_REQUIREMENTS"]:
+                return Response(evaluate_client_requirements(tmp_path))
+            elif category_clean in ["STATE_REQUIREMENT_CHECK", "STATE_REQUIREMENTS"]:
+                return Response(evaluate_state_requirements(tmp_path))
+
             form_type_str = str(form_type or "").strip().upper()
             if not custom_prompt:
                 # 100% Offline Pure Python Extraction (Fast & $0.00 cost)
