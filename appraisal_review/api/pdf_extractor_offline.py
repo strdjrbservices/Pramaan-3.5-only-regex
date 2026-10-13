@@ -3093,22 +3093,20 @@ def extract_page_2_sales_grid_and_reconciliation(page_p2, page_extra_comps=None,
                         grid[col_key]["Data Source(s) for prior sale"] = s_val
                         grid[col_key]["Effective Date of Data Source(s) for prior sale"] = e_val
 
-    # Aliases for all comps in grid
+    # Standardize comp keys in grid to canonical COMPARABLE SALE #{i}
+    canonical_grid = {}
+    if "Subject" in grid:
+        canonical_grid["Subject"] = grid["Subject"]
     for comp_k in list(grid.keys()):
+        if comp_k == "Subject":
+            continue
         m_num = re.search(r'#\s*(\d+)', comp_k)
         if m_num:
             i = int(m_num.group(1))
-            c_val = grid[comp_k]
-            grid[f"COMPARABLE SALE #{i}"] = c_val
-            grid[f"COMPARABLE SALE # {i}"] = c_val
-            grid[f"COMPARABLE SALE NO. {i}"] = c_val
-            grid[f"COMPARABLE SALE NO.{i}"] = c_val
-            grid[f"Comparable {i}"] = c_val
-            grid[f"Comp {i}"] = c_val
-            grid[f"COMP {i}"] = c_val
-            grid[f"COMPARABLE #{i}"] = c_val
-            grid[f"COMPARABLE # {i}"] = c_val
-            grid[f"Comparable Sale #{i}"] = c_val
+            canonical_grid[f"COMPARABLE SALE #{i}"] = grid[comp_k]
+        elif comp_k not in canonical_grid:
+            canonical_grid[comp_k] = grid[comp_k]
+    grid = canonical_grid
 
     for col_key in grid:
         adj_price = grid[col_key].get("Adjusted Sale Price of Comparables") or grid[col_key].get("Adjusted Sale Price of Comparable", "")
@@ -5307,15 +5305,26 @@ def clean_appraisal_extracted_data(data):
                     except Exception:
                         pass
 
-                # Clean spurious adjustments in non-adjustment rows
-                for noise_field in [
-                    "Address Adjustment", "Proximity to Subject Adjustment", "Sale Price Adjustment",
-                    "Sale Price/Gross Liv. Area Adjustment", "Data Source(s) Adjustment",
-                    "Verification Source(s) Adjustment", "Functional Utility Adjustment",
-                    "Heating/Cooling Adjustment", "Energy Efficient Items Adjustment"
-                ]:
-                    if comp_clean.get(noise_field) and comp_clean[noise_field] in ["PA 19082", "RECORDS", "34", "53", "10", "11", "102", "23"]:
-                        comp_clean[noise_field] = ""
+                # Clean spurious adjustments in non-adjustment rows and clean Subject
+                if norm_k == "Subject":
+                    for k_subj in list(comp_clean.keys()):
+                        if "Adjustment" in k_subj or k_subj in [
+                            "Adjusted Sale Price of Comparables", "Adjusted Sale Price of Comparable",
+                            "Adjusted Sale Price", "Net Adjustment (Total)", "Proximity to Subject",
+                            "Proximity to Subject comment"
+                        ]:
+                            if not comp_clean[k_subj]:
+                                del comp_clean[k_subj]
+                else:
+                    for noise_field in [
+                        "Address Adjustment", "Proximity to Subject Adjustment", "Sale Price Adjustment",
+                        "Sale Price/Gross Liv. Area Adjustment", "Data Source(s) Adjustment",
+                        "Verification Source(s) Adjustment", "Net Adjustment (Total) Adjustment",
+                        "Adjusted Sale Price of Comparables Adjustment", "Adjusted Sale Price Adjustment",
+                        "Adjusted Sale Price of Comparable Adjustment"
+                    ]:
+                        if noise_field in comp_clean:
+                            del comp_clean[noise_field]
 
                 # Room count normalization
                 tot = str(comp_clean.get("Total Rooms") or "").strip()
@@ -5364,21 +5373,20 @@ def clean_appraisal_extracted_data(data):
 
                 clean_grid[norm_k] = comp_clean
 
-        # Populate all alias keys into clean_grid
-        for k in list(clean_grid.keys()):
-            m_comp = re.search(r'#\s*(\d+)', k)
-            if m_comp:
-                c_idx = m_comp.group(1)
-                comp_obj = clean_grid[k]
-                clean_grid[f"COMPARABLE SALE #{c_idx}"] = comp_obj
-                clean_grid[f"COMPARABLE SALE # {c_idx}"] = comp_obj
-                clean_grid[f"COMPARABLE #{c_idx}"] = comp_obj
-                clean_grid[f"COMPARABLE # {c_idx}"] = comp_obj
-                clean_grid[f"Comparable Sale #{c_idx}"] = comp_obj
-                clean_grid[f"Comp {c_idx}"] = comp_obj
-                clean_grid[f"COMP {c_idx}"] = comp_obj
+        # Sort and clean clean_grid: Subject first, followed by comps in numerical order
+        sorted_clean_grid = {}
+        if "Subject" in clean_grid:
+            sorted_clean_grid["Subject"] = clean_grid["Subject"]
 
-        data["SALES_GRID"] = clean_grid
+        comp_keys = [k for k in clean_grid if k != "Subject"]
+        def get_comp_idx(k):
+            m = re.search(r'#\s*(\d+)', k)
+            return int(m.group(1)) if m else 999
+
+        for k in sorted(comp_keys, key=get_comp_idx):
+            sorted_clean_grid[k] = clean_grid[k]
+
+        data["SALES_GRID"] = sorted_clean_grid
 
     # 5. Clean and Sync SALES_TRANSFER and RECONCILIATION
     st = data.get("SALES_TRANSFER")
@@ -5883,7 +5891,6 @@ def extract_fields_from_pdf_offline(pdf_path):
                             unified_fields[f"Rental {r_num}"] = rent_v
 
             raw_json_str = json.dumps(unified_fields, indent=2)
-            unified_fields["raw"] = raw_json_str
 
             return {
                 "fields": unified_fields,

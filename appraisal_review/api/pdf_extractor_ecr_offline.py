@@ -1971,7 +1971,6 @@ def extract_fields_from_pdf_ecr_offline(pdf_path: str) -> dict:
         unified_fields["form_type"] = "ERC"
 
         raw_json_str = json.dumps(unified_fields, indent=2, default=str)
-        unified_fields["raw"] = raw_json_str
 
         return {
             "fields": unified_fields,

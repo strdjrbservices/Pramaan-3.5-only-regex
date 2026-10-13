@@ -42,7 +42,7 @@ import {
 } from '@mui/icons-material';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import VisibilityTwoToneIcon from '@mui/icons-material/VisibilityTwoTone';
-import { Button, Stack, IconButton, Tooltip, Paper, Box, Typography, LinearProgress, Alert, Snackbar, Fade, CircularProgress, useTheme, CssBaseline, Dialog, DialogTitle, DialogContent, DialogActions, Grid, Fab, Autocomplete, TextField } from '@mui/material';
+import { Button, Stack, IconButton, Tooltip, Paper, Box, Typography, LinearProgress, Alert, Snackbar, Fade, CircularProgress, useTheme, CssBaseline, Dialog, DialogTitle, DialogContent, DialogActions, Grid, Fab, Autocomplete, TextField, FormControl, InputLabel, Select, MenuItem, Chip } from '@mui/material';
 import jsPDF from 'jspdf';
 import GetAppIcon from '@mui/icons-material/GetApp';
 import autoTable from 'jspdf-autotable';
@@ -56,7 +56,7 @@ import {
   EngagementLetterDialog,
 } from './components/dialogs.js';
 import { SalesComparisonSection, ComparisonResultTable, SubjectRentScheduleTable } from './components/tables.js';
-import { getComparisonStyle, playSound, API_BASE_URL } from './utils/utils.js';
+import { getComparisonStyle, playSound, API_BASE_URL, SECTION_DISPLAY_NAMES, sanitizeJsonForPreview, getCleanStructuredJson } from './utils/utils.js';
 
 import Form1004 from './2.6/1004';
 import Form1007 from './2.6/1007';
@@ -288,6 +288,21 @@ function Subject({ defaultFormType }) {
   const activeTheme = useTheme();
   const location = useLocation();
   const [data, setData] = useState({});
+  const [selectedJsonSection, setSelectedJsonSection] = useState('ALL');
+
+  const cleanFullJson = useMemo(() => {
+    return getCleanStructuredJson(data, 'ALL');
+  }, [data]);
+
+  const availableJsonSections = useMemo(() => {
+    return Object.keys(cleanFullJson);
+  }, [cleanFullJson]);
+
+  const displayedCleanJson = useMemo(() => {
+    const rawSectionData = getCleanStructuredJson(data, selectedJsonSection);
+    return sanitizeJsonForPreview(rawSectionData);
+  }, [data, selectedJsonSection]);
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
@@ -2961,6 +2976,7 @@ function Subject({ defaultFormType }) {
     setContractFile(null);
     setEngagementLetterFile(null);
     setData({});
+    setSelectedJsonSection('ALL');
     setExtractionAttempted(false);
     setLastExtractionTime(null);
     setRawGemini('');
@@ -2994,6 +3010,7 @@ function Subject({ defaultFormType }) {
     const file = e.target.files && e.target.files[0];
 
     setData({});
+    setSelectedJsonSection('ALL');
     setExtractionAttempted(false);
     setLastExtractionTime(null);
     setRawGemini('');
@@ -3150,6 +3167,7 @@ function Subject({ defaultFormType }) {
       }
     });
     Object.assign(normalizedFields, result.fields);
+    delete normalizedFields.raw;
 
     // Unpack SALES_GRID comps and Subject
     const salesGrid = result.fields?.SALES_GRID || result.clean_data?.SALES_GRID || result.SALES_GRID;
@@ -3214,6 +3232,9 @@ function Subject({ defaultFormType }) {
       });
       return updatedData;
     });
+    if (category && typeof category === 'string') {
+      setSelectedJsonSection(category);
+    }
     setRawGemini(result.raw || '');
     const durationInMs = Date.now() - startTime;
     const totalSeconds = Math.floor(durationInMs / 1000);
@@ -3406,6 +3427,7 @@ function Subject({ defaultFormType }) {
         STATE_REQUIREMENT_CHECK: checkData,
         'State Requirement Check': checkData
       }));
+      setSelectedJsonSection('STATE_REQUIREMENT_CHECK');
     } catch (e) {
       const errorMsg = e.message || 'An unexpected error occurred.';
       setStateReqError(errorMsg);
@@ -3464,6 +3486,7 @@ function Subject({ defaultFormType }) {
         UNPAID_OK_CHECK: checkData,
         'Unpaid OK Check': checkData
       }));
+      setSelectedJsonSection('UNPAID_OK_CHECK');
       setModalContent({
         title: 'Unpaid OK Lender Check',
         Component: UnpaidOkCheck,
@@ -3518,6 +3541,7 @@ function Subject({ defaultFormType }) {
         CLIENT_REQUIREMENT_CHECK: checkData,
         'Client Requirement Check': checkData
       }));
+      setSelectedJsonSection('CLIENT_REQUIREMENT_CHECK');
     } catch (e) {
       const errorMsg = e.message || 'An unexpected error occurred.';
       setClientReqError(errorMsg);
@@ -3578,6 +3602,7 @@ function Subject({ defaultFormType }) {
         FHA_REQUIREMENT_CHECK: checkData,
         'FHA Requirement Check': checkData
       }));
+      setSelectedJsonSection('FHA_REQUIREMENT_CHECK');
       setModalContent({
         title: 'FHA Requirement Check',
         Component: FhaCheck,
@@ -3648,6 +3673,7 @@ function Subject({ defaultFormType }) {
         ADU_CHECK: checkData,
         'ADU Check': checkData
       }));
+      setSelectedJsonSection('ADU_CHECK');
       setModalContent({
         title: 'ADU File Check',
         Component: ADUCheck,
@@ -3701,6 +3727,7 @@ function Subject({ defaultFormType }) {
         ESCALATION_CHECK: checkData,
         'Escalation Check': checkData
       }));
+      setSelectedJsonSection('ESCALATION_CHECK');
     } catch (e) {
       const errorMsg = e.message || 'An unexpected error occurred.';
       setEscalationError(errorMsg);
@@ -3717,6 +3744,10 @@ function Subject({ defaultFormType }) {
     }
     if (!section.category) {
       return;
+    }
+
+    if (typeof section.category === 'string') {
+      setSelectedJsonSection(section.category);
     }
 
     setNotification({ open: true, message: `Extracting ${section.title}...`, severity: 'info' });
@@ -4050,15 +4081,16 @@ function Subject({ defaultFormType }) {
     try {
       const totalTime = `${Math.floor(fileUploadTimer / 3600).toString().padStart(2, '0')}:${Math.floor((fileUploadTimer % 3600) / 60).toString().padStart(2, '0')}:${(fileUploadTimer % 60).toString().padStart(2, '0')}`;
 
-      const cleanedData = JSON.parse(JSON.stringify(data));
-
+      const cleanedData = JSON.parse(JSON.stringify(getCleanStructuredJson(data, 'ALL')));
 
       const sectionOrder = [
+        'SUBJECT',
         'Subject',
         'CONTRACT',
         'NEIGHBORHOOD',
         'SITE',
         'IMPROVEMENTS',
+        'SALES_GRID',
         'SALES_TRANSFER',
         'PRIOR_SALE_HISTORY',
         'RECONCILIATION',
@@ -4076,7 +4108,13 @@ function Subject({ defaultFormType }) {
         'SUBJECT_RENT_SCHEDULE',
         'RENT_SCHEDULE_GRID',
         'RENT_SCHEDULE_RECONCILIATION',
-        'COMPARABLE_RENTAL_DATA'
+        'COMPARABLE_RENTAL_DATA',
+        'STATE_REQUIREMENT_CHECK',
+        'CLIENT_REQUIREMENT_CHECK',
+        'ESCALATION_CHECK',
+        'FHA_REQUIREMENT_CHECK',
+        'ADU_CHECK',
+        'UNPAID_OK_CHECK'
       ];
 
       sectionOrder.forEach(section => {
@@ -6265,22 +6303,57 @@ function Subject({ defaultFormType }) {
                     border: `1px solid ${activeTheme.palette.divider}`
                   }}
                 >
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                    <Typography variant="h6" fontWeight={700} display="flex" alignItems="center" gap={1}>
-                      <CodeIcon color="primary" />
-                      Extracted JSON Data (Raw Data)
-                    </Typography>
-                    <Stack direction="row" spacing={1}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} gap={2} mb={2}>
+                    <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
+                      <Typography variant="h6" fontWeight={700} display="flex" alignItems="center" gap={1}>
+                        <CodeIcon color="primary" />
+                        Extracted JSON Data (Raw Data)
+                      </Typography>
+                      <Chip
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        label={
+                          selectedJsonSection === 'ALL'
+                            ? `${availableJsonSections.length} Sections`
+                            : `${SECTION_DISPLAY_NAMES[selectedJsonSection] || selectedJsonSection}`
+                        }
+                      />
+                    </Stack>
+                    <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                      <FormControl size="small" sx={{ minWidth: 220 }}>
+                        <InputLabel id="json-section-filter-label">Filter Section</InputLabel>
+                        <Select
+                          labelId="json-section-filter-label"
+                          id="json-section-filter-select"
+                          value={selectedJsonSection}
+                          label="Filter Section"
+                          onChange={(e) => setSelectedJsonSection(e.target.value)}
+                        >
+                          <MenuItem value="ALL">
+                            <em>All Sections (Clean JSON)</em>
+                          </MenuItem>
+                          {availableJsonSections.map((secKey) => (
+                            <MenuItem key={secKey} value={secKey}>
+                              {SECTION_DISPLAY_NAMES[secKey] || secKey.replace(/_/g, ' ')}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                       <Button
                         size="small"
                         variant="outlined"
                         startIcon={<FileDownloadIcon />}
                         onClick={() => {
-                          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                          const downloadData = displayedCleanJson;
+                          const fileName = selectedJsonSection === 'ALL'
+                            ? 'extracted_appraisal_data.json'
+                            : `extracted_${selectedJsonSection.toLowerCase()}.json`;
+                          const blob = new Blob([JSON.stringify(downloadData, null, 2)], { type: 'application/json' });
                           const url = URL.createObjectURL(blob);
                           const a = document.createElement('a');
                           a.href = url;
-                          a.download = 'extracted_appraisal_data.json';
+                          a.download = fileName;
                           a.click();
                           URL.revokeObjectURL(url);
                         }}
@@ -6291,8 +6364,12 @@ function Subject({ defaultFormType }) {
                         size="small"
                         variant="contained"
                         onClick={() => {
-                          navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-                          setNotification({ open: true, message: 'JSON copied to clipboard!', severity: 'success' });
+                          navigator.clipboard.writeText(JSON.stringify(displayedCleanJson, null, 2));
+                          setNotification({
+                            open: true,
+                            message: `${selectedJsonSection === 'ALL' ? 'Clean appraisal JSON' : `${SECTION_DISPLAY_NAMES[selectedJsonSection] || selectedJsonSection} JSON`} copied to clipboard!`,
+                            severity: 'success'
+                          });
                         }}
                       >
                         Copy JSON
@@ -6310,12 +6387,12 @@ function Subject({ defaultFormType }) {
                       fontFamily: 'Consolas, Monaco, monospace',
                       fontSize: '0.875rem',
                       lineHeight: 1.6,
-                      maxHeight: '450px',
+                      maxHeight: '480px',
                       overflow: 'auto',
                       boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
                     }}
                   >
-                    <code>{JSON.stringify(data, null, 2)}</code>
+                    <code>{JSON.stringify(displayedCleanJson, null, 2)}</code>
                   </Box>
                 </Paper>
               )}

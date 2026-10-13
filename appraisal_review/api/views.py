@@ -786,6 +786,10 @@ def extract_pdf(request):
                             )
                         except Exception as e:
                             print(f"Error evaluating escalation check: {e}")
+                        if "clean_data" in offline_data and isinstance(offline_data["clean_data"], dict):
+                            for k in ["STATE_REQUIREMENT_CHECK", "CLIENT_REQUIREMENT_CHECK", "ESCALATION_CHECK"]:
+                                if k in offline_data["fields"]:
+                                    offline_data["clean_data"][k] = offline_data["fields"][k]
                     return Response(offline_data)
             else:
                 prompt_lower = str(custom_prompt or "").lower()
