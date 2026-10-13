@@ -594,7 +594,7 @@ CATEGORY_SPECIFIC_INSTRUCTIONS = {
         "12. **'Occupant'**: Strictly extract the checked option from ['Owner', 'Tenant', 'Vacant'].\n"
         "13. **'Property Rights Appraised'**: Strictly extract the checked option from ['Fee Simple', 'Leasehold', 'Other'].\n"
         "14. **'Assignment Type'**: Strictly extract the checked option from ['Purchase Transaction', 'Refinance Transaction', 'Other'].\n"
-        "15. **'Appraiser\'s Fee'**: Search all pages of the report for the Appraiser Fee using keywords like 'Appraiser Fee', 'Appraiser\'s Fee', 'Appraisal Fee', 'Total Fee', 'Agreed Fee', 'Fee', 'Invoice Amount' (e.g., 'Appraiser Fee; $525.00 dollars', 'Appraiser Fee: $525.00', 'Fee: $525'). Extract the clean numeric or currency fee amount (e.g. '$525.00' or '525.00'). If not found, output 'Not Disclosed'.\n"
+        "15. **'Appraiser\'s Fee'**: Search all pages of the report for the Appraiser/Appraisal Fee using phrases like 'The fee paid to the appraiser for this assignment is $500.00', 'Appraisal Fee: $550.00', 'Appraisal fee was: $495.00', or labeled as 'Appraiser\'s Fee', 'Appraisers Fee', 'Appraiser Fee', 'Appraisal Fee'. Extract the clean numeric or currency fee amount (e.g. '$500.00' or '500.00'). If not found, output 'Not Disclosed' or leave empty.\n"
     ),
     "CONTRACT": (
         "--- CONTRACT Section Instructions ---\n"

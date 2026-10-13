@@ -1267,7 +1267,8 @@ def extract_exposure_comment_from_doc(doc=None, full_doc_text=""):
 def extract_appraiser_fee_from_doc(doc=None, full_doc_text=""):
     """
     Extracts the Appraiser's Fee across all pages of the document
-    searching for keywords: 'Appraiser Fee', 'Appraiser\'s Fee', 'Appraisal Fee', 'Total Fee', 'Agreed Fee', 'Fee', 'Invoice Amount', 'TOTAL DUE', 'FULL RESIDENTIAL APPRAISAL'.
+    ONLY when explicitly labeled as 'Appraiser's Fee', 'Appraisers Fee', or 'Appraiser Fee'.
+    Otherwise does not extract any value.
     """
     candidate_texts = []
     if doc is not None:
@@ -1278,11 +1279,10 @@ def extract_appraiser_fee_from_doc(doc=None, full_doc_text=""):
         candidate_texts.append(full_doc_text)
 
     fee_patterns = [
-        re.compile(r'(?:Appraiser(?:\'s)?\s*Fee|Appraisal\s*Fee|Appraiser\s*Fee)[^0-9\$\n]{0,35}\$?\s*([0-9,]+(?:\.\d{2})?)(?:\s*(?:dollars?|usd))?', re.IGNORECASE),
-        re.compile(r'(?:Total\s*Fee|Agreed\s*Fee|Professional\s*Fee|Fee\s*Charged|Fee\s*Amount)[^0-9\$\n]{0,35}\$?\s*([0-9,]+(?:\.\d{2})?)(?:\s*(?:dollars?|usd))?', re.IGNORECASE),
-        re.compile(r'(?:Invoice\s*Amount|Invoice\s*Total|Total\s*Amount\s*Due|TOTAL\s*DUE|Amount\s*Due)[^0-9\$\n]{0,35}\$?\s*([0-9,]+(?:\.\d{2})?)(?:\s*(?:dollars?|usd))?', re.IGNORECASE),
-        re.compile(r'(?:FULL\s+RESIDENTIAL\s+APPRAISAL|Appraisal\s+of\s+single\s+family\s+home)[^0-9\$\n]{0,35}\$?\s*([0-9,]+(?:\.\d{2})?)(?:\s*(?:dollars?|usd))?', re.IGNORECASE),
-        re.compile(r'\bFee\b[^0-9\$\n]{0,25}\$?\s*([0-9,]+(?:\.\d{2})?)(?:\s*(?:dollars?|usd))?', re.IGNORECASE),
+        re.compile(r'(?:Appraiser[\'’]s|Appraisers|Appraiser|Appraisal)\s*Fee(?:[^\S\r\n]+(?:is|was))?[^0-9\$\n\r]{0,35}\$?\s*([0-9,]+(?:\.\d{2})?)(?:\s*(?:dollars?|usd))?', re.IGNORECASE),
+        re.compile(r'(?:Appraiser[\'’]s|Appraisers|Appraiser|Appraisal)\s*Fee(?:[^\S\r\n]+(?:is|was))?\s*[:\-]?(?:\r?\n)\s*\$?\s*([0-9,]+(?:\.\d{2})?)(?:\s*(?:dollars?|usd))?', re.IGNORECASE),
+        re.compile(r'(?:fee\s+paid\s+to\s+(?:the\s+)?appraiser[^0-9\$\n\r]{0,65})\$?\s*([0-9,]+(?:\.\d{2})?)(?:\s*(?:dollars?|usd))?', re.IGNORECASE),
+        re.compile(r'(?:fee\s+paid\s+to\s+(?:the\s+)?appraiser[^0-9\$\n\r]{0,65})\s*[:\-]?(?:\r?\n)\s*\$?\s*([0-9,]+(?:\.\d{2})?)(?:\s*(?:dollars?|usd))?', re.IGNORECASE),
     ]
 
     for txt in candidate_texts:
@@ -1306,6 +1306,7 @@ def extract_amc_info_from_doc(doc=None, full_doc_text=""):
     """
     amc_name = ""
     amc_lic = ""
+    amc_exp = ""
 
     candidate_texts = []
     if doc is not None:
@@ -1326,14 +1327,66 @@ def extract_amc_info_from_doc(doc=None, full_doc_text=""):
                 amc_name = "COAST TO COAST APPRAISAL SERVICES, INC"
 
         if not amc_lic:
-            m_lic = re.search(r'(?:Registration\s+No\.?|Registration\s+#|AMC\s+License\s*#?|AMC\s+Reg\s*#?)\s*[:\-]?\s*([A-Za-z0-9\.\-]+)', txt, re.IGNORECASE)
+            m_lic = re.search(r'(?:Registration\s+No\.?|Registration\s+#|AMC\s+License\s*#?|AMC\s+Reg\s*#?|AMC\s+Registration\s*#?)\s*[:\-]?\s*([A-Za-z0-9\.\-]+)', txt, re.IGNORECASE)
             if m_lic:
                 amc_lic = m_lic.group(1).strip()
 
+        if not amc_exp:
+            m_exp = re.search(r'(?:AMC\s*(?:License|Registration)?\s*Exp(?:iration)?(?:\s*Date)?|License\s*Expires?)\s*[:\-]?\s*(\d{1,2}/\d{1,2}/\d{2,4})', txt, re.IGNORECASE)
+            if m_exp:
+                amc_exp = m_exp.group(1).strip()
+
     return {
         "amc_name": amc_name,
-        "amc_license": amc_lic
+        "amc_license": amc_lic,
+        "amc_expiration": amc_exp
     }
+
+
+def extract_amc_fee_from_doc(doc=None, full_doc_text=""):
+    """
+    Extracts AMC Fee across all pages of the document.
+    """
+    candidate_texts = []
+    if doc is not None:
+        for page in doc:
+            t = page.get_text("text") or ""
+            candidate_texts.append(t)
+    if not candidate_texts and full_doc_text:
+        candidate_texts.append(full_doc_text)
+
+    amc_fee_patterns = [
+        re.compile(r'(?:AMC\s*Fee|AMC\s*Management\s*Fee|Management\s*Fee|Appraisal\s*Management\s*(?:Company\s*)?Fee)[^0-9\$\n\r]{0,35}\$?\s*([0-9,]+(?:\.\d{2})?)', re.IGNORECASE),
+        re.compile(r'(?:AMC\s*Fee|AMC\s*Management\s*Fee|Management\s*Fee)\s*[:\-]?(?:\r?\n)\s*\$?\s*([0-9,]+(?:\.\d{2})?)', re.IGNORECASE),
+    ]
+
+    for txt in candidate_texts:
+        for pat in amc_fee_patterns:
+            m = pat.search(txt)
+            if m and m.group(1):
+                raw_num = m.group(1).replace(",", "").strip()
+                try:
+                    num_val = float(raw_num)
+                    if 10.0 <= num_val <= 10000.0:
+                        return f"${num_val:,.2f}" if "." in m.group(1) else f"${int(num_val):,}"
+                except ValueError:
+                    pass
+
+    return ""
+
+
+def check_invoice_attached_in_doc(doc=None, full_doc_text=""):
+    """
+    Checks if an invoice page or statement is attached in the document.
+    """
+    if doc is not None:
+        for idx, page in enumerate(doc):
+            t = page.get_text("text") or ""
+            if re.search(r'\bINVOICE\b', t, re.IGNORECASE) and re.search(r'\b(?:Invoice\s*(?:#|Number|No|Date|Total|Amount)|Bill\s*To|Remit\s*To|TOTAL\s*DUE)\b', t, re.IGNORECASE):
+                return True, idx + 1
+    if full_doc_text and re.search(r'\bINVOICE\b', full_doc_text, re.IGNORECASE) and re.search(r'\b(?:Invoice\s*(?:#|Number|No|Date|Total)|Bill\s*To|Remit\s*To)\b', full_doc_text, re.IGNORECASE):
+        return True, 1
+    return False, None
 
 
 def extract_smoke_and_carbon_comments_from_doc(doc=None, full_doc_text="", extracted_photos=None):
@@ -5567,19 +5620,46 @@ def clean_appraisal_extracted_data(data):
             data["Subject"]["Exposure Comment"] = exp_val
 
     # 12. Clean & Sync Appraiser's Fee
-    fee_val = data.get("Appraiser's Fee") or data.get("Appraiser Fee") or data.get("Appraisal Fee") or (data.get("SUBJECT", {}).get("Appraiser's Fee") if isinstance(data.get("SUBJECT"), dict) else "") or (data.get("CERTIFICATION", {}).get("Appraiser's Fee") if isinstance(data.get("CERTIFICATION"), dict) else "") or (data.get("Subject", {}).get("Appraiser's Fee") if isinstance(data.get("Subject"), dict) else "") or ""
+    fee_val = data.get("Appraiser's Fee") or data.get("Appraiser Fee") or data.get("Appraisers Fee") or data.get("Appraisal Fee") or (data.get("SUBJECT", {}).get("Appraiser's Fee") if isinstance(data.get("SUBJECT"), dict) else "") or (data.get("CERTIFICATION", {}).get("Appraiser's Fee") if isinstance(data.get("CERTIFICATION"), dict) else "") or (data.get("Subject", {}).get("Appraiser's Fee") if isinstance(data.get("Subject"), dict) else "") or ""
     if fee_val:
         data["Appraiser's Fee"] = fee_val
         data["Appraiser Fee"] = fee_val
+        data["Appraisal Fee"] = fee_val
         if isinstance(data.get("SUBJECT"), dict):
             data["SUBJECT"]["Appraiser's Fee"] = fee_val
             data["SUBJECT"]["Appraiser Fee"] = fee_val
+            data["SUBJECT"]["Appraisal Fee"] = fee_val
         if isinstance(data.get("CERTIFICATION"), dict):
             data["CERTIFICATION"]["Appraiser's Fee"] = fee_val
             data["CERTIFICATION"]["Appraiser Fee"] = fee_val
+            data["CERTIFICATION"]["Appraisal Fee"] = fee_val
         if isinstance(data.get("Subject"), dict):
             data["Subject"]["Appraiser's Fee"] = fee_val
             data["Subject"]["Appraiser Fee"] = fee_val
+            data["Subject"]["Appraisal Fee"] = fee_val
+
+    # 13. Clean & Sync AMC Fee
+    amc_fee = data.get("AMC Fee") or (data.get("SUBJECT", {}).get("AMC Fee") if isinstance(data.get("SUBJECT"), dict) else "") or (data.get("CERTIFICATION", {}).get("AMC Fee") if isinstance(data.get("CERTIFICATION"), dict) else "") or (data.get("Subject", {}).get("AMC Fee") if isinstance(data.get("Subject"), dict) else "") or ""
+    if amc_fee:
+        data["AMC Fee"] = amc_fee
+        if isinstance(data.get("SUBJECT"), dict):
+            data["SUBJECT"]["AMC Fee"] = amc_fee
+        if isinstance(data.get("CERTIFICATION"), dict):
+            data["CERTIFICATION"]["AMC Fee"] = amc_fee
+        if isinstance(data.get("Subject"), dict):
+            data["Subject"]["AMC Fee"] = amc_fee
+
+    # 14. Clean & Sync AMC License #
+    amc_lic = data.get("AMC License #") or data.get("AMC Reg. Number") or (data.get("SUBJECT", {}).get("AMC License #") if isinstance(data.get("SUBJECT"), dict) else "") or (data.get("CERTIFICATION", {}).get("AMC License #") if isinstance(data.get("CERTIFICATION"), dict) else "") or ""
+    if amc_lic:
+        data["AMC License #"] = amc_lic
+        data["AMC Reg. Number"] = amc_lic
+        if isinstance(data.get("SUBJECT"), dict):
+            data["SUBJECT"]["AMC License #"] = amc_lic
+            data["SUBJECT"]["AMC Reg. Number"] = amc_lic
+        if isinstance(data.get("CERTIFICATION"), dict):
+            data["CERTIFICATION"]["AMC License #"] = amc_lic
+            data["CERTIFICATION"]["AMC Reg. Number"] = amc_lic
 
     return data
 
@@ -5829,6 +5909,25 @@ def extract_fields_from_pdf_offline(pdf_path):
                     data["SUBJECT"]["AMC License #"] = amc_info["amc_license"]
                 if "CERTIFICATION" in data and isinstance(data["CERTIFICATION"], dict):
                     data["CERTIFICATION"]["AMC License #"] = amc_info["amc_license"]
+            if amc_info.get("amc_expiration"):
+                data["AMC Expiration Date"] = amc_info["amc_expiration"]
+
+            # Extract AMC Fee across entire document
+            amc_fee_doc = extract_amc_fee_from_doc(doc=doc, full_doc_text=full_doc_text)
+            if amc_fee_doc:
+                data["AMC Fee"] = amc_fee_doc
+                if "SUBJECT" in data and isinstance(data["SUBJECT"], dict):
+                    data["SUBJECT"]["AMC Fee"] = amc_fee_doc
+                if "CERTIFICATION" in data and isinstance(data["CERTIFICATION"], dict):
+                    data["CERTIFICATION"]["AMC Fee"] = amc_fee_doc
+
+            # Check Invoice Attached
+            has_inv, inv_pg = check_invoice_attached_in_doc(doc=doc, full_doc_text=full_doc_text)
+            if has_inv:
+                data["Invoice Attached"] = "Yes"
+                data["Invoice"] = "Yes"
+                if inv_pg:
+                    data["Invoice Page"] = inv_pg
 
             # Apply Master Sanitization & Clean-up FIRST so signed values and numbers are pristine
             clean_data = clean_appraisal_extracted_data(data)
